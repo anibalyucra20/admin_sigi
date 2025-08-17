@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# 1) Si la URL está vacía, redirige a public/
+RewriteRule ^$ public/ [L]
+
+# 2) Todo lo demás que no sea archivo/carpeta real → public/<lo mismo>
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/$1 [L]

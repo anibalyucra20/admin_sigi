@@ -1,0 +1,12 @@
+config.php
+public/images/*.jpg
+public/images/*.ico
+public/images/*.png
+public/images/*.gif
+public/images/*.jpeg
+public/images/*.web
+public/images/*.webp
+public/images/*.svg
+public/images/*.pdf
+public/images/*.docx
+public/images/*.docx

@@ -1,0 +1,11 @@
+RewriteEngine On
+RewriteBase /
+
+# 1) Bloquear acceso directo a app/ y core/  
+#    Si alguien pide /app/Algo.php o /core/Model.php, devuelve 403
+RewriteRule ^(app|core)(/|$) - [F,L]
+
+# 2) Si no es un fichero o directorio real, redirige a index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.+)$ index.php?url=$1 [QSA,L]
