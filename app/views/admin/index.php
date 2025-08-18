@@ -1,4 +1,33 @@
 <?php require __DIR__ . '/../layouts/header.php'; ?>
+
+<?php //echo password_hash('mi-clave-super', PASSWORD_BCRYPT); ?>
+
+<?php
+
+$apiKey = 'mi-clave-super'; // Reemplaza con tu clave API
+$url = 'http://localhost/api/health'; // Reemplaza con la URL de la API
+
+$ch = curl_init($url);
+
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Recibir respuesta como string
+curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+  'X-API-KEY: ' . $apiKey, // Añadir la cabecera X-API-KEY
+  'Content-Type: application/json' // O el tipo de contenido que espera la API
+));
+
+$response = curl_exec($ch);
+
+if (curl_errno($ch)) {
+  echo 'Error en la solicitud cURL: ' . curl_error($ch);
+} else {
+  echo 'Respuesta de la API: ' . $response;
+}
+
+curl_close($ch);
+
+?>
+
+
 <?php if (!empty($_SESSION['flash_error'])) : ?>
   <div class="alert alert-danger alert-dismissible">
     <?= $_SESSION['flash_error'] ?>

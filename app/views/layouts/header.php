@@ -83,32 +83,32 @@ endif;
             <div class="collapse navbar-collapse" id="topnav-menu-content">
               <ul class="navbar-nav">
                 <li class="nav-item">
-                  <a class="nav-link <?= ($_SERVER['REQUEST_URI'] === '/intranet' ? 'active' : '') ?>"
-                    href="<?= BASE_URL ?>/intranet">
+                  <a class="nav-link <?= ($_SERVER['REQUEST_URI'] === '/admin' ? 'active' : '') ?>"
+                    href="<?= BASE_URL ?>/admin">
                     <i class="mdi mdi-home-analytics"></i> Inicio
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/planes') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/intranet/plan">
+                    href="<?= BASE_URL ?>/admin/plan">
                     <i class="mdi mdi-school"></i> Planes
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/biblioteca') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/intranet/ies">
+                    href="<?= BASE_URL ?>/admin/ies">
                     <i class="mdi mdi-school"></i> Biblioteca
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/ies') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/intranet/ies">
+                    href="<?= BASE_URL ?>/admin/ies">
                     <i class="mdi mdi-school"></i> IES
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/apis') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/intranet/ies">
+                    href="<?= BASE_URL ?>/admin/ies">
                     <i class="mdi mdi-school"></i> APIS
                   </a>
                 </li>

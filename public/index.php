@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../vendor/autoload.php';
 // Calcula el path base del proyecto automáticamente
 $basePath = dirname(dirname($_SERVER['SCRIPT_NAME']));
 if ($basePath === '\\' || $basePath === '' || $basePath === '/') {

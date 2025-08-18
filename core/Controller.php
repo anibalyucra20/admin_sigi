@@ -9,7 +9,7 @@ class Controller
     public function __construct()
     {
         \Core\Auth::start();
-        $allowedNoAuth = ['logout', 'login', 'login/acceder', 'recuperar', 'reestablecer']; // rutas públicas
+        $allowedNoAuth = ['logout', 'login', 'login/acceder', 'recuperar', 'restablecer']; // rutas públicas
 
         $current = $_GET['url'] ?? '';
 
@@ -30,26 +30,7 @@ class Controller
                 exit;
             }
         }
-        // Refresca permisos SOLO si está logueado y la ruta no es pública
-        if ($isUserLogged && !$isRutaPublica && isset($_SESSION['sigi_user_id'])) {
-            $id_usuario = $_SESSION['sigi_user_id'];
-            $db = (new \Core\Model())->getDB();
-            $sql = "SELECT psu.id_sistema, s.nombre as sistema, psu.id_rol, r.nombre as rol
-                FROM sigi_permisos_usuarios psu
-                INNER JOIN sigi_sistemas_integrados s ON s.id = psu.id_sistema
-                INNER JOIN sigi_roles r ON r.id = psu.id_rol
-                WHERE psu.id_usuario = ? ORDER BY r.id DESC";
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$id_usuario]);
-            $_SESSION['sigi_permisos_usuario'] = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            //obtener informacion de logos para cargar en vista
-            $sql2 = "SELECT favicon, logo FROM sigi_datos_sistema WHERE id=1";
-            $datos_logos = $db->prepare($sql2);
-            $datos_logos->execute();
-            $datos_logos = $datos_logos->fetch(\PDO::FETCH_ASSOC);
-            $_SESSION['favicon'] = $datos_logos['favicon'];
-            $_SESSION['logo'] = $datos_logos['logo'];
-        }
+        
     }
     public function modelo($modelo)
     {

@@ -15,7 +15,10 @@ class Model
             throw new \Exception('Acceso no autorizado');
         }
         if (self::$db === null) {
-            $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8';
+            $port = defined('DB_PORT') ? DB_PORT : 3306;
+            $charset = 'utf8mb4';
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . $port . ";dbname=" . DB_NAME . ";charset=" . $charset;
+
             // Crea tu conexión aquí solo si no existe
             self::$db = new \PDO($dsn, DB_USER, DB_PASS);
             self::$db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
