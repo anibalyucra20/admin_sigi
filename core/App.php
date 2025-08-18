@@ -159,7 +159,7 @@ class App
         $route = filter_var($route, FILTER_SANITIZE_URL);
         // Aquí agregas la redirección a intranet si está vacío
         if ($route === '' || $route === false) {
-            header('Location: ' . BASE_URL . '/intranet');
+            header('Location: ' . BASE_URL . '/admin');
             exit;
         }
         return $route === '' ? [] : explode('/', $route);

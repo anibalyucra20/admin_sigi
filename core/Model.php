@@ -40,7 +40,7 @@ class Model
     public static function log($id_usuario, $accion, $descripcion = '', $tabla = null, $id_registro = null)
     {
         $db = self::getDB();
-        $sql = "INSERT INTO sigi_logs (id_usuario, accion, descripcion, tabla_afectada, id_registro, ip_usuario)
+        $sql = "INSERT INTO logs (id_usuario, accion, descripcion, tabla_afectada, id_registro, ip_usuario)
             VALUES (:id_usuario, :accion, :descripcion, :tabla_afectada, :id_registro, :ip_usuario)";
         $stmt = $db->prepare($sql);
         $stmt->execute([
