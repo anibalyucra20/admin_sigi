@@ -58,10 +58,13 @@ class BaseApiController
 
     private function shouldCountUsage(): bool
     {
-        // Normaliza path
         $path = '/' . trim($_GET['url'] ?? '/', '/'); // ej: /api/library/items
-        // 👇 Whitelist de biblioteca (lectura y subida) que NO cuentan
-        if (preg_match('#^/api/library/(items|show|upload|adopt)(/|$)#', $path)) {
+
+        // NO cuentan en usage: lectura, búsqueda, subida y adopción de libros
+        if (preg_match('#^/api/library/(items|show|search|upload|adopt|unadopt|adopted)(/|$)#', $path)) {
+            return false;
+        }
+        if (preg_match('#^/api/health$#', $path)) { // opcional
             return false;
         }
         return true;

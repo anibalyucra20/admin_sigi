@@ -54,7 +54,7 @@
                     ?>
                     <img src="<?= $ruta_logo ?>" alt="Logo SIGI" class="logo">
                     <h4 class="mb-2">SIGI</h4>
-                    <p class="text-muted mb-4">Sistema de Gestión Institucional</p>
+                    <p class="text-muted mb-4">ADMINISTRADOR</p>
                 </div>
                 <?php if (isset($_GET['error'])): ?>
                     <div class="alert alert-danger">Credenciales incorrectas</div>

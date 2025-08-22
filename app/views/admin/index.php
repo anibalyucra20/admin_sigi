@@ -5,7 +5,7 @@
 <?php
 
 $apiKey = 'mi-clave-super'; // Reemplaza con tu clave API
-$url = 'http://localhost/api/health'; // Reemplaza con la URL de la API
+$url = 'http://localhost/api/library/search?search=algebra&per_page=5'; // Reemplaza con la URL de la API
 
 $ch = curl_init($url);
 
@@ -26,8 +26,6 @@ if (curl_errno($ch)) {
 curl_close($ch);
 
 ?>
-
-
 <?php if (!empty($_SESSION['flash_error'])) : ?>
   <div class="alert alert-danger alert-dismissible">
     <?= $_SESSION['flash_error'] ?>
