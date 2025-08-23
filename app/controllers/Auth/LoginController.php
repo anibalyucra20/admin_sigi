@@ -46,10 +46,10 @@ class LoginController extends Controller
 
             $sql = "INSERT INTO sesiones (id_usuario, fecha_hora_inicio, fecha_hora_fin, token, ip, estado) VALUES (?,  NOW(), NOW(), ?, ?, 1)";
             $stmt = $db->prepare($sql);
-            $stmt->execute([$user['id'], $token, $_SERVER['REMOTE_ADDR']]);
+            $stmt->execute([$user['id'], $llave, $_SERVER['REMOTE_ADDR']]);
 
             $user['id_session'] = $db->lastInsertId();
-            $user['token'] = $llave;
+            $user['token'] = $token;
 
             \Core\Auth::login($user);
            
