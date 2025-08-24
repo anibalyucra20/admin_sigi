@@ -13,12 +13,12 @@ class Model
     public function __construct()
     {
         // Gate solo para MVC (no para API)
-        if (
+        /*if (
             (!defined('IS_API') || !IS_API)
             && !Auth::user()
         ) {
             throw new \Exception('Acceso no autorizado');
-        }
+        }*/
 
         if (self::$db === null) {
             self::connect();

@@ -36,7 +36,7 @@
 
 ?>
 
-<body style="background-color: <?= $datosSistema['color_correo'] ?>;">
+<body style="background-color: #132fe9ff;">
     <div class="container d-flex align-items-center justify-content-center login-container">
         <div class="col-md-6 col-lg-6">
             <div class="card p-4">
