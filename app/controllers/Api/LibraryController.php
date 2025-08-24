@@ -438,11 +438,12 @@ class LibraryController extends BaseApiController
 
     /* ========== GET /api/library/adopted ========== */
     // App/Controllers/Api/LibraryController.php
+    // App/Controllers/Api/LibraryController.php
     public function adopted()
     {
         $this->requireApiKey();
 
-        // Filtros opcionales por cadena académica
+        // (opcional) lee filtros si quieres filtrar en servidor
         $p = [
             'id_programa_estudio' => isset($_GET['id_programa_estudio']) ? (int)$_GET['id_programa_estudio'] : null,
             'id_plan'             => isset($_GET['id_plan']) ? (int)$_GET['id_plan'] : null,
@@ -453,7 +454,6 @@ class LibraryController extends BaseApiController
 
         $where = ["v.id_ies = ?"];
         $bind  = [$this->tenantId];
-
         foreach ($p as $col => $val) {
             if ($val) {
                 $where[] = "v.$col = ?";
@@ -473,25 +473,22 @@ class LibraryController extends BaseApiController
     ";
 
         $st = $this->db->prepare($sql);
-        foreach ($bind as $i => $val) {
-            $st->bindValue($i + 1, $val, \PDO::PARAM_INT);
-        }
+        foreach ($bind as $i => $val) $st->bindValue($i + 1, $val, \PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-        // map a mismo formato + cadena
-        $data = array_map(function ($r) {
-            $cfg = $this->cfg();
-            $row = $this->mapRow($r, $cfg);
+        $data = array_map(function (array $r): array {
+            $row = $this->mapRow($r, $cfg = $this->cfg());
             $row['vinculo'] = [
-                'id_programa_estudio' => (int)$r['id_programa_estudio'],
-                'id_plan'             => (int)$r['id_plan'],
-                'id_modulo_formativo' => (int)$r['id_modulo_formativo'],
-                'id_semestre'         => (int)$r['id_semestre'],
-                'id_unidad_didactica' => (int)$r['id_unidad_didactica'],
+                'id_programa_estudio' => (int)($r['id_programa_estudio'] ?? 0),
+                'id_plan'             => (int)($r['id_plan'] ?? 0),
+                'id_modulo_formativo' => (int)($r['id_modulo_formativo'] ?? 0),
+                'id_semestre'         => (int)($r['id_semestre'] ?? 0),
+                'id_unidad_didactica' => (int)($r['id_unidad_didactica'] ?? 0),
             ];
             return $row;
         }, $rows);
+
 
         return $this->json(['data' => $data]);
     }
