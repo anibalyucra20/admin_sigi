@@ -7,11 +7,7 @@
     <title>Login - SIGI</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <?php
-    if ($datosSistema['favicon'] != '') {
-        $ruta_favicon = BASE_URL . '/images/' . $datosSistema['favicon'];
-    } else {
         $ruta_favicon = BASE_URL . '/img/favicon.ico';
-    }
     ?>
     <link rel="icon" type="image/x-icon" href="<?= $ruta_favicon ?>">
     <style>
@@ -46,11 +42,7 @@
             <div class="card p-4">
                 <div class="text-center">
                     <?php
-                    if ($datosSistema['logo'] != '') {
-                        $ruta_logo = BASE_URL . '/images/' . $datosSistema['logo'];
-                    } else {
                         $ruta_logo = BASE_URL . '/img/logo_completo.png';
-                    }
                     ?>
                     <img src="<?= $ruta_logo ?>" alt="Logo SIGI" class="logo">
                     <h4 class="mb-2">SIGI</h4>
