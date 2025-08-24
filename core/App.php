@@ -166,8 +166,16 @@ class App
     }
 
     /* ------------------------------------ */
+    // core/App.php
     private function render404(string $msg)
     {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+        if (strpos($path, '/api/') === 0 || strtolower($this->module ?? '') === 'api') {
+            http_response_code(404);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => false, 'error' => ['code' => 'NOT_FOUND', 'message' => $msg]], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         http_response_code(404);
         echo "<h1>404</h1><p>{$msg}</p>";
         exit;

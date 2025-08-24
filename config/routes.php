@@ -14,4 +14,8 @@ return [
   /* … resto de rutas … */
   /*'set-contexto'    => 'Auth/ContextoController@set',*/
 
+  // Admin » Planes
+
+
+
 ];

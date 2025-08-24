@@ -9,7 +9,7 @@ class Controller
     public function __construct()
     {
         \Core\Auth::start();
-        $allowedNoAuth = ['logout', 'login', 'login/acceder', 'recuperar', 'restablecer']; // rutas públicas
+        $allowedNoAuth = ['logout', 'login', 'login/acceder', 'recuperar', 'restablecer', 'api']; // rutas públicas
 
         $current = $_GET['url'] ?? '';
 
@@ -26,11 +26,12 @@ class Controller
 
         if (!$isAuthRoute && !$isRutaPublica) {
             if (!$isUserLogged || !\Core\Auth::validarSesion()) {
-                header('Location: ' . BASE_URL . '/login');
-                exit;
+                if (!defined('IS_API') || !IS_API) {
+                    header('Location: ' . BASE_URL . '/login');
+                    exit;
+                }
             }
         }
-        
     }
     public function modelo($modelo)
     {

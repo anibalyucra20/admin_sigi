@@ -6,8 +6,11 @@ class Auth
 {
     public static function start()
     {
-        if (session_status() !== PHP_SESSION_ACTIVE)
-            session_start();
+        if (defined('IS_API') && IS_API) {
+            // En API no usamos sesión/cookies
+            return;
+        }
+        if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     }
 
     public static function login(array $user)
@@ -46,6 +49,7 @@ class Auth
 
     public static function validarSesion()
     {
+        if (defined('IS_API') && IS_API) return true;
         self::start();
         if (!empty($_SESSION['admin_sigi_session_id'])) {
             $session_id = $_SESSION['admin_sigi_session_id'] ?? null;
@@ -61,7 +65,7 @@ class Auth
             $stmt->execute([$session_id, $user_id]);
             $sesion = $stmt->fetch();
 
-            $tiempoSession = 240 * 60;// 240 minutos de sesion
+            $tiempoSession = 240 * 60; // 240 minutos de sesion
 
             if (!$sesion) {
                 self::logout(); // sesión expirada o cerrada desde admin

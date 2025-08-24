@@ -11,3 +11,15 @@ public/images/*.svg
 public/images/*.pdf
 public/images/*.docx
 public/images/*.docx
+
+
+public/books/*.pdf
+public/books/*.epub
+public/books/*.mobi
+public/covers/*.jpg
+public/covers/*.jpeg
+public/covers/*.png
+public/covers/*.gif
+public/covers/*.webp
+public/covers/*.svg
+public/covers/*.web

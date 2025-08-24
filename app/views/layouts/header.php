@@ -96,33 +96,35 @@ endif;
                 </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/biblioteca') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/admin/ies">
+                    href="<?= BASE_URL ?>/admin/biblioteca">
                     <i class="mdi mdi-school"></i> Biblioteca
                   </a>
                 </li>
-                <li class="nav-item">
-                  <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/ies') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/admin/ies">
-                    <i class="mdi mdi-school"></i> IES
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/apis') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/admin/ies">
-                    <i class="mdi mdi-school"></i> APIS
-                  </a>
-                </li>
-                <!-- Menú normal solo si es administrador -->
-                <!--
                 <li class="nav-item dropdown">
                   <a class="nav-link dropdown-toggle arrow-none" href="#" id="nav-matriculas" role="button"
                     data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="mdi mdi-bank-transfer"></i> Evaluación <div class="arrow-down"></div>
+                    <i class="mdi mdi-bank-transfer"></i> IES <div class="arrow-down"></div>
                   </a>
                   <div class="dropdown-menu" aria-labelledby="nav-matriculas">
-                    <a href="<?= BASE_URL ?>/academico/unidadesDidacticas/evaluar" class="dropdown-item">Registros de evaluacion</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/ies">IES</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/apiKeys">Api Keys</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/recibos">Recibos</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/pagos">Pagos</a>
                   </div>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/suscripcion') !== false ? 'active' : '' ?>"
+                    href="<?= BASE_URL ?>/admin/suscripcion">
+                    <i class="mdi mdi-school"></i> Suscripciones
+                  </a>
+                </li>
+                <!--<li class="nav-item">
+                  <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/apiKeys') !== false ? 'active' : '' ?>"
+                    href="<?= BASE_URL ?>/admin/apiKeys">
+                    <i class="mdi mdi-school"></i> APIS
+                  </a>
                 </li>-->
+
               </ul>
             </div>
           </nav>
