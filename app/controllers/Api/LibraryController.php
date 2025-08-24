@@ -189,7 +189,36 @@ class LibraryController extends BaseApiController
             ]);
 
             $id = (int)$this->db->lastInsertId();
-            return $this->json(['ok' => true, 'id' => $id, 'owner_ies' => $this->tenantId], 201);
+            // ... después de $id = (int)$this->db->lastInsertId();
+
+            $adopted = false;
+            $duplicated = null;
+                $sqlV = "INSERT INTO biblioteca_vinculos
+             (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
+             VALUES (?,?,?,?,?,?,?, NOW())
+             ON DUPLICATE KEY UPDATE id=id"; // idempotente
+                $stV = $this->db->prepare($sqlV);
+                $stV->execute([
+                    $this->tenantId,
+                    $id,
+                    (int)$in['id_programa_estudio'],
+                    (int)$in['id_plan'],
+                    (int)$in['id_modulo_formativo'],
+                    (int)$in['id_semestre'],
+                    (int)$in['id_unidad_didactica'],
+                ]);
+                // Cuando cae en DUPLICATE KEY sin cambios, rowCount() suele ser 0 → 'duplicated'
+                $duplicated = ($stV->rowCount() === 0);
+                $adopted    = true;
+
+            // Respuesta
+            return $this->json([
+                'ok'         => true,
+                'id'         => $id,
+                'owner_ies'  => $this->tenantId,
+                'adopted'    => $adopted,
+                'duplicated' => $duplicated, // null si no se envió cadena
+            ], 201);
         } catch (\Throwable $e) {
             // que no quede 500 vacío
             return $this->json(['ok' => false, 'error' => ['code' => 'EXCEPTION', 'message' => $e->getMessage()]], 500);
