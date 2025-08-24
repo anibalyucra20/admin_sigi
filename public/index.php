@@ -1,6 +1,5 @@
 <?php
 
-
 // public/index.php (muy arriba)
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 define('IS_API', strpos($path, '/api/') === 0);
@@ -36,7 +35,7 @@ if (IS_API) {
 }
 
 
-require_once __DIR__ . '/../vendor/autoload.php';
+
 // Base path y cookies
 $basePath = dirname(dirname($_SERVER['SCRIPT_NAME']));
 if ($basePath === '\\' || $basePath === '' || $basePath === '/') {
