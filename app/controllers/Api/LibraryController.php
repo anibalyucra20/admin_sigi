@@ -193,23 +193,23 @@ class LibraryController extends BaseApiController
 
             $adopted = false;
             $duplicated = null;
-                $sqlV = "INSERT INTO biblioteca_vinculos
+            $sqlV = "INSERT INTO biblioteca_vinculos
              (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
              VALUES (?,?,?,?,?,?,?, NOW())
              ON DUPLICATE KEY UPDATE id=id"; // idempotente
-                $stV = $this->db->prepare($sqlV);
-                $stV->execute([
-                    $this->tenantId,
-                    $id,
-                    (int)$in['id_programa_estudio'],
-                    (int)$in['id_plan'],
-                    (int)$in['id_modulo_formativo'],
-                    (int)$in['id_semestre'],
-                    (int)$in['id_unidad_didactica'],
-                ]);
-                // Cuando cae en DUPLICATE KEY sin cambios, rowCount() suele ser 0 → 'duplicated'
-                $duplicated = ($stV->rowCount() === 0);
-                $adopted    = true;
+            $stV = $this->db->prepare($sqlV);
+            $stV->execute([
+                $this->tenantId,
+                $id,
+                (int)$in['id_programa_estudio'],
+                (int)$in['id_plan'],
+                (int)$in['id_modulo_formativo'],
+                (int)$in['id_semestre'],
+                (int)$in['id_unidad_didactica'],
+            ]);
+            // Cuando cae en DUPLICATE KEY sin cambios, rowCount() suele ser 0 → 'duplicated'
+            $duplicated = ($stV->rowCount() === 0);
+            $adopted    = true;
 
             // Respuesta
             return $this->json([
@@ -437,22 +437,62 @@ class LibraryController extends BaseApiController
     }
 
     /* ========== GET /api/library/adopted ========== */
+    // App/Controllers/Api/LibraryController.php
     public function adopted()
     {
         $this->requireApiKey();
-        $st = $this->db->prepare("
-            SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
-              FROM biblioteca_vinculos v
-              JOIN biblioteca_libros bl ON bl.id = v.id_libro
-             WHERE v.id_ies = ?
-             ORDER BY bl.id DESC
-             LIMIT 1000
-        ");
-        $st->execute([$this->tenantId]);
+
+        // Filtros opcionales por cadena académica
+        $p = [
+            'id_programa_estudio' => isset($_GET['id_programa_estudio']) ? (int)$_GET['id_programa_estudio'] : null,
+            'id_plan'             => isset($_GET['id_plan']) ? (int)$_GET['id_plan'] : null,
+            'id_modulo_formativo' => isset($_GET['id_modulo_formativo']) ? (int)$_GET['id_modulo_formativo'] : null,
+            'id_semestre'         => isset($_GET['id_semestre']) ? (int)$_GET['id_semestre'] : null,
+            'id_unidad_didactica' => isset($_GET['id_unidad_didactica']) ? (int)$_GET['id_unidad_didactica'] : null,
+        ];
+
+        $where = ["v.id_ies = ?"];
+        $bind  = [$this->tenantId];
+
+        foreach ($p as $col => $val) {
+            if ($val) {
+                $where[] = "v.$col = ?";
+                $bind[] = $val;
+            }
+        }
+
+        $sql = "
+      SELECT 
+        bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
+        v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
+      FROM biblioteca_vinculos v
+      JOIN biblioteca_libros bl ON bl.id = v.id_libro
+      WHERE " . implode(' AND ', $where) . "
+      ORDER BY bl.id DESC
+      LIMIT 1000
+    ";
+
+        $st = $this->db->prepare($sql);
+        foreach ($bind as $i => $val) {
+            $st->bindValue($i + 1, $val, \PDO::PARAM_INT);
+        }
+        $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-        $cfg = $this->cfg();
-        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows);
-        $this->json(['data' => $data], 200);
+        // map a mismo formato + cadena
+        $data = array_map(function ($r) {
+            $cfg = $this->cfg();
+            $row = $this->mapRow($r, $cfg);
+            $row['vinculo'] = [
+                'id_programa_estudio' => (int)$r['id_programa_estudio'],
+                'id_plan'             => (int)$r['id_plan'],
+                'id_modulo_formativo' => (int)$r['id_modulo_formativo'],
+                'id_semestre'         => (int)$r['id_semestre'],
+                'id_unidad_didactica' => (int)$r['id_unidad_didactica'],
+            ];
+            return $row;
+        }, $rows);
+
+        return $this->json(['data' => $data]);
     }
 }
