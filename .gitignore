@@ -10,10 +10,12 @@ public/images/*.webp
 public/images/*.svg
 public/images/*.pdf
 public/images/*.docx
-public/images/*.docx
+public/images/*.doc
 
 
 public/books/*.pdf
+public/books/*.docx
+public/books/*.doc
 public/books/*.epub
 public/books/*.mobi
 public/covers/*.jpg
