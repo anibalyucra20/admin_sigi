@@ -7,8 +7,10 @@ require_once __DIR__ . '/BaseApiController.php';
 class LibraryController extends BaseApiController
 {
     /* ---------- helpers ---------- */
-    private function mapRow(array $r, array $cfg): array
+    /* ---------- helpers ---------- */
+    private function mapRow(array $r): array
     {
+        $cfg = $this->cfg();
         return [
             'id'          => (int)$r['id'],
             'owner_ies'   => (int)$r['id_ies'],
@@ -17,10 +19,11 @@ class LibraryController extends BaseApiController
             'isbn'        => $r['isbn'],
             'tipo_libro'  => $r['tipo_libro'],
             'anio'        => $r['anio'],
-            'portada_url' => $r['portada'] ? ($cfg['library']['covers_base_url'] . '/' . $r['portada']) : null,
+            'portada_url' => !empty($r['portada']) ? ($cfg['library']['covers_base_url'] . '/' . $r['portada']) : null,
             'archivo_url' => $cfg['library']['files_base_url'] . '/' . $r['libro'],
         ];
     }
+
 
     /* ========== POST /api/library/upload (multipart/form-data) ========== */
     public function upload()
@@ -189,35 +192,39 @@ class LibraryController extends BaseApiController
             ]);
 
             $id = (int)$this->db->lastInsertId();
-            // ... después de $id = (int)$this->db->lastInsertId();
+
+            // Adoptar inmediatamente solo si viene la cadena completa
+            $keys = ['id_programa_estudio', 'id_plan', 'id_modulo_formativo', 'id_semestre', 'id_unidad_didactica'];
+            $hasChain = !array_diff_key(array_flip($keys), $in);
 
             $adopted = false;
             $duplicated = null;
-            $sqlV = "INSERT INTO biblioteca_vinculos
-             (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
-             VALUES (?,?,?,?,?,?,?, NOW())
-             ON DUPLICATE KEY UPDATE id=id"; // idempotente
-            $stV = $this->db->prepare($sqlV);
-            $stV->execute([
-                $this->tenantId,
-                $id,
-                (int)$in['id_programa_estudio'],
-                (int)$in['id_plan'],
-                (int)$in['id_modulo_formativo'],
-                (int)$in['id_semestre'],
-                (int)$in['id_unidad_didactica'],
-            ]);
-            // Cuando cae en DUPLICATE KEY sin cambios, rowCount() suele ser 0 → 'duplicated'
-            $duplicated = ($stV->rowCount() === 0);
-            $adopted    = true;
 
-            // Respuesta
+            if ($hasChain) {
+                $sqlV = "INSERT INTO biblioteca_vinculos
+            (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
+            VALUES (?,?,?,?,?,?,?, NOW())
+            ON DUPLICATE KEY UPDATE id=id";
+                $stV = $this->db->prepare($sqlV);
+                $stV->execute([
+                    $this->tenantId,
+                    $id,
+                    (int)$in['id_programa_estudio'],
+                    (int)$in['id_plan'],
+                    (int)$in['id_modulo_formativo'],
+                    (int)$in['id_semestre'],
+                    (int)$in['id_unidad_didactica'],
+                ]);
+                $duplicated = ($stV->rowCount() === 0);
+                $adopted = true;
+            }
+
             return $this->json([
                 'ok'         => true,
                 'id'         => $id,
                 'owner_ies'  => $this->tenantId,
                 'adopted'    => $adopted,
-                'duplicated' => $duplicated, // null si no se envió cadena
+                'duplicated' => $duplicated,
             ], 201);
         } catch (\Throwable $e) {
             // que no quede 500 vacío
@@ -237,8 +244,9 @@ class LibraryController extends BaseApiController
         $st = $this->db->prepare("SELECT 1 FROM biblioteca_libros WHERE id=? AND id_ies=?");
         $st->execute([$libroId, $this->tenantId]);
         if ($st->fetchColumn()) {
-            $this->json(['ok' => true, 'message' => 'Ya es propio', 'duplicated' => true], 200);
+            return $this->json(['ok' => true, 'message' => 'Ya es propio', 'duplicated' => true], 200);
         }
+
 
         // Validar libro existente
         $st = $this->db->prepare("SELECT 1 FROM biblioteca_libros WHERE id=? LIMIT 1");
@@ -369,7 +377,6 @@ class LibraryController extends BaseApiController
         }
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-
         $data = array_map([$this, 'mapRow'], $rows);
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
     }
@@ -413,9 +420,7 @@ class LibraryController extends BaseApiController
         $st->bindValue(':per', (int)$per, \PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-
-        $cfg = $this->cfg();
-        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows);
+        $data = array_map([$this, 'mapRow'], $rows);
         $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
     }
 
@@ -478,7 +483,7 @@ class LibraryController extends BaseApiController
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
         $data = array_map(function (array $r): array {
-            $row = $this->mapRow($r, $cfg = $this->cfg());
+            $row = $this->mapRow($r);   // ← sin $cfg
             $row['vinculo'] = [
                 'id_programa_estudio' => (int)($r['id_programa_estudio'] ?? 0),
                 'id_plan'             => (int)($r['id_plan'] ?? 0),
@@ -488,7 +493,6 @@ class LibraryController extends BaseApiController
             ];
             return $row;
         }, $rows);
-
 
         return $this->json(['data' => $data]);
     }
