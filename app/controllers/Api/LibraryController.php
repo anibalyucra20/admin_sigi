@@ -355,10 +355,7 @@ class LibraryController extends BaseApiController
         }
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-
-        // mapRow ya resuelve cfg() internamente
-        $data = array_map([$this, 'mapRow'], $rows);
-
+        $data = array_map([$this, 'mapRow'], $rows); // sin cfg
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
     }
 
@@ -378,26 +375,30 @@ class LibraryController extends BaseApiController
         $sql = "SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
               FROM biblioteca_libros
              WHERE 1=1";
-        $params = [];
+
         if ($q !== '') {
-            $sql .= " AND (titulo LIKE :q OR autor LIKE :q OR temas_relacionados LIKE :q)";
-            $params[':q'] = "%$q%";
+            $sql .= " AND (titulo LIKE :q1 OR autor LIKE :q2 OR temas_relacionados LIKE :q3)";
         }
 
-        // Evita HY093 con LIMIT
+        // IMPORTANTE: evitar placeholders en LIMIT para no mezclar nombrados/repetidos
         $sql .= " ORDER BY id DESC LIMIT " . (int)$off . ", " . (int)$per;
 
         $st = $this->db->prepare($sql);
-        foreach ($params as $k => $v) {
-            $st->bindValue($k, $v, \PDO::PARAM_STR);
+
+        if ($q !== '') {
+            $like = "%$q%";
+            $st->bindValue(':q1', $like, \PDO::PARAM_STR);
+            $st->bindValue(':q2', $like, \PDO::PARAM_STR);
+            $st->bindValue(':q3', $like, \PDO::PARAM_STR);
         }
+
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
         $data = array_map([$this, 'mapRow'], $rows);
-
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
     }
+
 
 
     /* ========== GET /api/library/show/{id} ========== */
