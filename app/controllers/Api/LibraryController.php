@@ -320,38 +320,32 @@ class LibraryController extends BaseApiController
         $off  = ($page - 1) * $per;
 
         $q    = trim($_GET['search'] ?? '');
-        $tipo = trim($_GET['tipo'] ?? '');
 
         $w1 = '';
         $p1 = [];
         if ($q !== '') {
-            $w1 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ?)";
+            $w1 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
+            $p1[] = "%$q%";
             $p1[] = "%$q%";
             $p1[] = "%$q%";
         }
-        if ($tipo !== '') {
-            $w1 .= " AND bl.tipo_libro = ?";
-            $p1[] = $tipo;
-        }
+        
 
         $w2 = '';
         $p2 = [];
         if ($q !== '') {
-            $w2 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ?)";
+            $w2 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
             $p2[] = "%$q%";
             $p2[] = "%$q%";
-        }
-        if ($tipo !== '') {
-            $w2 .= " AND bl.tipo_libro = ?";
-            $p2[] = $tipo;
+            $p2[] = "%$q%";
         }
 
         $sql = "
-      SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+      SELECT bl.id AS id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
         FROM biblioteca_libros bl
        WHERE bl.id_ies = ? $w1
       UNION
-      SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+      SELECT bl.id AS id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
         FROM biblioteca_vinculos v
         JOIN biblioteca_libros bl ON bl.id = v.id_libro
        WHERE v.id_ies = ? $w2
