@@ -313,7 +313,7 @@ class LibraryController extends BaseApiController
     /* ========== GET /api/library/items (propios + adoptados) ========== */
     public function items()
     {
-        $this->requireApiKey(); // asegúrate de validar la API key
+        $this->requireApiKey();
 
         $page = max(1, (int)($_GET['page'] ?? 1));
         $per  = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
@@ -322,7 +322,6 @@ class LibraryController extends BaseApiController
         $q    = trim($_GET['search'] ?? '');
         $tipo = trim($_GET['tipo'] ?? '');
 
-        // Filtros para cada SELECT del UNION (hay que duplicar los valores)
         $w1 = '';
         $p1 = [];
         if ($q !== '') {
@@ -360,26 +359,22 @@ class LibraryController extends BaseApiController
        LIMIT ?, ?
     ";
 
-        // Orden exacto de binds
-        $bind = array_merge(
-            [$this->tenantId],
-            $p1,
-            [$this->tenantId],
-            $p2,
-            [(int)$off, (int)$per]
-        );
+        $bind = array_merge([$this->tenantId], $p1, [$this->tenantId], $p2, [(int)$off, (int)$per]);
 
         $st = $this->db->prepare($sql);
         $i = 1;
         foreach ($bind as $val) {
-            $type = is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-            $st->bindValue($i++, $val, $type);
+            $st->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-        $data = array_map([$this, 'mapRow'], $rows);
+
+        $cfg  = $this->cfg(); // ← añade esto
+        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows); // ← y pásalo
+
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
     }
+
 
 
     /* ========== GET /api/library/search (global) ========== */
