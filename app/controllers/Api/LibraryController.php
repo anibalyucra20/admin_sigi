@@ -320,40 +320,41 @@ class LibraryController extends BaseApiController
         $off  = ($page - 1) * $per;
 
         $q    = trim($_GET['search'] ?? '');
+        $tipo = trim($_GET['tipo'] ?? '');
 
-        $w1 = '';
-        $p1 = [];
+        // Construimos una SOLA cadena de filtros y un SOLO array de params,
+        // y luego reutilizamos ambos para cada SELECT, duplicando el array.
+        $cond = [];
+        $pars = [];
+
         if ($q !== '') {
-            $w1 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
-            $p1[] = "%$q%";
-            $p1[] = "%$q%";
-            $p1[] = "%$q%";
+            // Si quieres incluir temas_relacionados, agrega también bl.temas_relacionados LIKE ?
+            $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ?)";
+            $pars[] = "%$q%";
+            $pars[] = "%$q%";
         }
-        
-
-        $w2 = '';
-        $p2 = [];
-        if ($q !== '') {
-            $w2 .= " AND (bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
-            $p2[] = "%$q%";
-            $p2[] = "%$q%";
-            $p2[] = "%$q%";
+        if ($tipo !== '') {
+            $cond[] = "bl.tipo_libro = ?";
+            $pars[] = $tipo;
         }
 
+        $W = $cond ? (' AND ' . implode(' AND ', $cond)) : '';
+
+        // Incrustamos LIMIT con enteros validados para evitar HY093 por LIMIT
         $sql = "
-      SELECT bl.id AS id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
-        FROM biblioteca_libros bl
-       WHERE bl.id_ies = ? $w1
-      UNION
-      SELECT bl.id AS id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
-        FROM biblioteca_vinculos v
-        JOIN biblioteca_libros bl ON bl.id = v.id_libro
-       WHERE v.id_ies = ? $w2
-       ORDER BY id DESC
-       LIMIT ?, ?
-    ";
+            SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+                FROM biblioteca_libros bl
+            WHERE bl.id_ies = ? $W
+            UNION
+            SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+                FROM biblioteca_vinculos v
+                JOIN biblioteca_libros bl ON bl.id = v.id_libro
+            WHERE v.id_ies = ? $W
+            ORDER BY 1 DESC
+            LIMIT " . (int)$off . ", " . (int)$per;
 
-        $bind = array_merge([$this->tenantId], $p1, [$this->tenantId], $p2, [(int)$off, (int)$per]);
+        // bind = [tenant, filtros..., tenant, filtros...]
+        $bind = array_merge([$this->tenantId], $pars, [$this->tenantId], $pars);
 
         $st = $this->db->prepare($sql);
         $i = 1;
@@ -363,11 +364,12 @@ class LibraryController extends BaseApiController
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-        $cfg  = $this->cfg(); // ← añade esto
-        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows); // ← y pásalo
+        $cfg  = $this->cfg();
+        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows);
 
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
     }
+
 
 
 
