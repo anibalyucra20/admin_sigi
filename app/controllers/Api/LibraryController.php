@@ -387,42 +387,36 @@ class LibraryController extends BaseApiController
     {
         $this->requireApiKey();
 
-        $page  = max(1, (int)($_GET['page'] ?? 1));
-        $per   = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
-        $off   = ($page - 1) * $per;
-        $q     = trim($_GET['search'] ?? '');
-        $tipo  = $_GET['tipo'] ?? null;
-        $owner = isset($_GET['owner']) ? (int)$_GET['owner'] : null;
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $per  = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
+        $off  = ($page - 1) * $per;
+        $q    = trim($_GET['search'] ?? '');
 
         $sql = "SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
-                  FROM biblioteca_libros
-                 WHERE 1=1";
+              FROM biblioteca_libros
+             WHERE 1=1";
         $params = [];
         if ($q !== '') {
-            $sql .= " AND (titulo LIKE :q OR autor LIKE :q)";
+            $sql .= " AND (titulo LIKE :q OR autor LIKE :q OR temas_relacionados LIKE :q)";
             $params[':q'] = "%$q%";
         }
-        if ($tipo) {
-            $sql .= " AND tipo_libro = :tipo";
-            $params[':tipo'] = $tipo;
-        }
-        if ($owner) {
-            $sql .= " AND id_ies = :owner";
-            $params[':owner'] = $owner;
-        }
-        $sql .= " ORDER BY id DESC LIMIT :off,:per";
+        $sql .= " ORDER BY id DESC LIMIT :off, :per";
 
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
-            $st->bindValue($k, $v, is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            $st->bindValue($k, $v, \PDO::PARAM_STR);
         }
         $st->bindValue(':off', (int)$off, \PDO::PARAM_INT);
         $st->bindValue(':per', (int)$per, \PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-        $data = array_map([$this, 'mapRow'], $rows);
-        $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
+
+        $cfg  = $this->cfg();
+        $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows);
+
+        return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
     }
+
 
     /* ========== GET /api/library/show/{id} ========== */
     public function show($id)
