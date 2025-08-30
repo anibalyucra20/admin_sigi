@@ -238,46 +238,65 @@ class LibraryController extends BaseApiController
     {
         $this->requireApiKey();
         $this->maybeReplayIdem();
-        $libroId = (int)$libroId;
 
-        // Si ya es propio, no crear vínculo
-        $st = $this->db->prepare("SELECT 1 FROM biblioteca_libros WHERE id=? AND id_ies=?");
-        $st->execute([$libroId, $this->tenantId]);
-        if ($st->fetchColumn()) {
-            return $this->json(['ok' => true, 'message' => 'Ya es propio', 'duplicated' => true], 200);
+        $libroId = (int)$libroId;
+        if ($libroId <= 0) {
+            $this->error('libro_id inválido', 422, 'VALIDATION');
         }
 
-
-        // Validar libro existente
-        $st = $this->db->prepare("SELECT 1 FROM biblioteca_libros WHERE id=? LIMIT 1");
+        // 1) El libro debe existir
+        $st = $this->db->prepare("SELECT id_ies FROM biblioteca_libros WHERE id=? LIMIT 1");
         $st->execute([$libroId]);
-        if (!$st->fetchColumn()) $this->error('Libro no existe', 404, 'NOT_FOUND');
+        $ownerIes = $st->fetchColumn();
+        if ($ownerIes === false) {
+            $this->error('Libro no existe', 404, 'NOT_FOUND');
+        }
 
-        // Body (JSON o form) con la cadena requerida por uq_vinc_det
+        // 2) Cadena académica obligatoria
         $body = $_POST ?: (json_decode(file_get_contents('php://input'), true) ?? []);
         $req  = ['id_programa_estudio', 'id_plan', 'id_modulo_formativo', 'id_semestre', 'id_unidad_didactica'];
         foreach ($req as $k) {
-            if (!isset($body[$k])) $this->error("Falta $k", 422, 'VALIDATION');
+            if (empty($body[$k])) $this->error("Falta $k", 422, 'VALIDATION');
+            $body[$k] = (int)$body[$k];
+            if ($body[$k] <= 0) $this->error("$k inválido", 422, 'VALIDATION');
         }
 
+        // 3) Si ya es propio, puedes considerar esto como ya “vinculado” lógicamente
+        //    (negocio original: retornar duplicated=true)
+        /*if ((int)$ownerIes === (int)$this->tenantId) {
+            return $this->respondIdem(['ok' => true, 'message' => 'Ya es propio', 'duplicated' => true], 200);
+        }*/
+
+        // 4) Insert idempotente en biblioteca_vinculos
         $sql = "INSERT INTO biblioteca_vinculos
-                (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
-                VALUES (?,?,?,?,?,?,?, NOW())
-                ON DUPLICATE KEY UPDATE id = id";
-        $st = $this->db->prepare($sql);
-        $st->execute([
-            $this->tenantId,
-            $libroId,
-            (int)$body['id_programa_estudio'],
-            (int)$body['id_plan'],
-            (int)$body['id_modulo_formativo'],
-            (int)$body['id_semestre'],
-            (int)$body['id_unidad_didactica'],
-        ]);
-        $duplicated = ($st->rowCount() === 0);
-        $payload = ['ok' => true, 'adopted_libro_id' => $libroId, 'duplicated' => $duplicated];
-        $this->respondIdem($payload, $duplicated ? 200 : 201);
+            (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
+            VALUES (?,?,?,?,?,?,?, NOW())
+            ON DUPLICATE KEY UPDATE id = id";
+        try {
+            $st = $this->db->prepare($sql);
+            $st->execute([
+                $this->tenantId,
+                $libroId,
+                $body['id_programa_estudio'],
+                $body['id_plan'],
+                $body['id_modulo_formativo'],
+                $body['id_semestre'],
+                $body['id_unidad_didactica'],
+            ]);
+
+            $duplicated = ($st->rowCount() === 0); // ya existía esa misma cadena
+            $payload = ['ok' => true, 'adopted_libro_id' => $libroId, 'duplicated' => $duplicated];
+            return $this->respondIdem($payload, $duplicated ? 200 : 201);
+        } catch (\PDOException $e) {
+            // Si tienes FKs, puedes mapear 1452 (foreign key) a mensaje legible
+            $sqlState = $e->errorInfo[1] ?? null;
+            if ($sqlState === 1452) {
+                return $this->json(['ok' => false, 'error' => ['code' => 'FK_VIOLATION', 'message' => 'Alguna referencia académica no existe']], 422);
+            }
+            return $this->json(['ok' => false, 'error' => ['code' => 'DB_ERROR', 'message' => $e->getMessage()]], 500);
+        }
     }
+
 
     /* ========== DELETE /api/library/adopt/{libro_id} ========== */
     public function unadopt($libroId)
