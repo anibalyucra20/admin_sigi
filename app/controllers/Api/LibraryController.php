@@ -7,10 +7,9 @@ require_once __DIR__ . '/BaseApiController.php';
 class LibraryController extends BaseApiController
 {
     /* ---------- helpers ---------- */
-    /* ---------- helpers ---------- */
-    private function mapRow(array $r): array
+    private function mapRow(array $r, ?array $cfg = null): array
     {
-        $cfg = $this->cfg();
+        $cfg = $cfg ?? $this->cfg();
         return [
             'id'          => (int)$r['id'],
             'owner_ies'   => (int)$r['id_ies'],
@@ -23,6 +22,7 @@ class LibraryController extends BaseApiController
             'archivo_url' => $cfg['library']['files_base_url'] . '/' . $r['libro'],
         ];
     }
+
 
 
     /* ========== POST /api/library/upload (multipart/form-data) ========== */
@@ -328,8 +328,8 @@ class LibraryController extends BaseApiController
         $pars = [];
 
         if ($q !== '') {
-            // Si quieres incluir temas_relacionados, agrega también bl.temas_relacionados LIKE ?
-            $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ?)";
+            $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
+            $pars[] = "%$q%";
             $pars[] = "%$q%";
             $pars[] = "%$q%";
         }
@@ -388,17 +388,17 @@ class LibraryController extends BaseApiController
              WHERE 1=1";
         $params = [];
         if ($q !== '') {
-            $sql .= " AND (titulo LIKE :q OR autor LIKE :q OR temas_relacionados LIKE :q)";
-            $params[':q'] = "%$q%";
+            $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
+            $pars[] = "%$q%";
+            $pars[] = "%$q%";
+            $pars[] = "%$q%";
         }
-        $sql .= " ORDER BY id DESC LIMIT :off, :per";
+        $sql .= " ORDER BY id DESC LIMIT " . (int)$off . ", " . (int)$per;
 
         $st = $this->db->prepare($sql);
         foreach ($params as $k => $v) {
             $st->bindValue($k, $v, \PDO::PARAM_STR);
         }
-        $st->bindValue(':off', (int)$off, \PDO::PARAM_INT);
-        $st->bindValue(':per', (int)$per, \PDO::PARAM_INT);
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
