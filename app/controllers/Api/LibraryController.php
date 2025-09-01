@@ -57,7 +57,7 @@ class LibraryController extends BaseApiController
         // --- Validaciones de archivos ---
         $bookFilename   = null;
         $coverFilename  = null;
-        $maxBytesBook   = 25 * 1024 * 1024;  // 25MB
+        $maxBytesBook   = 80 * 1024 * 1024;  // 80MB
         $maxBytesCover  = 5  * 1024 * 1024;  // 5MB
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
 
