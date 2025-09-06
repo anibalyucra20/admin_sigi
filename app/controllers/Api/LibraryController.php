@@ -493,45 +493,63 @@ class LibraryController extends BaseApiController
         return $this->json(['data' => $data]);
     }
 
-    // App/Controllers/Api/LibraryController.php
-
     public function update($id)
     {
-        $this->requireApiKey();
+        $this->requireApiKey();           // protege con API key
+        $this->maybeReplayIdem();         // soporta idempotencia (si lo usas)
+
         $id = (int)$id;
 
-        // 1) Verifica existencia y propiedad
-        $st = $this->db->prepare("SELECT * FROM biblioteca_libros WHERE id=?");
-        $st->execute([$id]);
-        $row = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$row) $this->error('Libro no existe', 404, 'NOT_FOUND');
-        if ((int)$row['id_ies'] !== $this->tenantId) {
-            $this->error('Solo el propietario puede editar este libro', 403, 'FORBIDDEN');
+        // 1) Verifica que el libro exista y sea del IES dueño
+        $st = $this->db->prepare("SELECT * FROM biblioteca_libros WHERE id=? AND id_ies=?");
+        $st->execute([$id, $this->tenantId]);
+        $book = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$book) {
+            $this->error('No encontrado o no eres el propietario', 404, 'NOT_FOUND');
         }
 
-        // 2) Config de almacenamiento
+        // 2) Rutas de almacenamiento
         $publicRoot = realpath(__DIR__ . '/../../../public');
         if ($publicRoot === false) {
-            return $this->json(['ok' => false, 'error' => ['code' => 'PATH_ERROR', 'message' => 'No se ubicó /public']], 500);
+            $this->error('No se ubicó /public', 500, 'PATH_ERROR');
         }
         $booksDir  = $publicRoot . DIRECTORY_SEPARATOR . 'books';
         $coversDir = $publicRoot . DIRECTORY_SEPARATOR . 'covers';
-        if (!is_dir($booksDir) && !@mkdir($booksDir, 0755, true)) {
-            return $this->json(['ok' => false, 'error' => ['code' => 'MKDIR_FAIL', 'message' => 'No se pudo crear /public/books']], 500);
-        }
-        if (!is_dir($coversDir) && !@mkdir($coversDir, 0755, true)) {
-            return $this->json(['ok' => false, 'error' => ['code' => 'MKDIR_FAIL', 'message' => 'No se pudo crear /public/covers']], 500);
+        if (!is_dir($booksDir))  @mkdir($booksDir, 0755, true);
+        if (!is_dir($coversDir)) @mkdir($coversDir, 0755, true);
+        if (!is_writable($booksDir) || !is_writable($coversDir)) {
+            $this->error('Directorios no escribibles', 500, 'DIR_NOT_WRITABLE');
         }
 
-        // 3) Entrada
+        // 3) Detecta JSON vs multipart
         $isMultipart = !empty($_FILES) || (isset($_SERVER['CONTENT_TYPE']) && stripos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') !== false);
         $in = $isMultipart ? $_POST : (json_decode(file_get_contents('php://input'), true) ?? []);
-        if (!is_array($in)) $in = [];
 
-        // 4) Sanitizador y validadores
+        // 4) Campos editables (solo actualiza los que llegan)
+        $fields = [
+            'titulo',
+            'autor',
+            'editorial',
+            'edicion',
+            'tomo',
+            'tipo_libro',
+            'isbn',
+            'paginas',
+            'anio',
+            'temas_relacionados',
+            'tags'
+        ];
+        $set = [];
+        $params = [];
+        foreach ($fields as $f) {
+            if (array_key_exists($f, $in)) {
+                $set[] = "$f = :$f";
+                $params[":$f"] = ($f === 'paginas' || $f === 'anio') ? (int)$in[$f] : trim((string)$in[$f]);
+            }
+        }
+
+        // 5) Validación/guardado de archivos opcionales
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $maxBytesBook  = 80 * 1024 * 1024; // 80MB
-        $maxBytesCover = 5  * 1024 * 1024; // 5MB
         $sanitize = function (string $name, string $fallbackExt) {
             $name = basename($name);
             $name = preg_replace('~[^A-Za-z0-9._-]+~', '-', $name) ?? 'file';
@@ -540,105 +558,81 @@ class LibraryController extends BaseApiController
             return substr($pref . $name, 0, 100);
         };
 
-        $newBookFilename  = null;
-        $newCoverFilename = null;
-
-        try {
-            // 5) Si viene nuevo LIBRO
-            if ($isMultipart && isset($_FILES['libro']) && $_FILES['libro']['error'] !== UPLOAD_ERR_NO_FILE) {
-                $f = $_FILES['libro'];
-                if ($f['error'] !== UPLOAD_ERR_OK) $this->error('Error subiendo libro', 422, 'UPLOAD_ERROR');
-                if ($f['size'] > $maxBytesBook)  $this->error('Libro supera el tamaño permitido', 413, 'FILE_TOO_LARGE');
-                if (!is_uploaded_file($f['tmp_name'])) $this->error('El archivo libro no es una subida válida', 422, 'NOT_UPLOADED');
-
-                $mime = $finfo->file($f['tmp_name']) ?: '';
-                $allowed = ['application/pdf', 'application/epub+zip'];
-                if (!in_array($mime, $allowed, true)) $this->error("Tipo de archivo no permitido ($mime)", 415, 'BAD_MIME');
-                $ext = $mime === 'application/pdf' ? 'pdf' : 'epub';
-
-                $newBookFilename = $sanitize($f['name'] ?: "libro.$ext", $ext);
-                if (!@move_uploaded_file($f['tmp_name'], $booksDir . DIRECTORY_SEPARATOR . $newBookFilename)) {
-                    $this->error('No se pudo guardar el libro', 500, 'MOVE_FAIL');
-                }
+        // Portada
+        if ($isMultipart && isset($_FILES['portada']) && $_FILES['portada']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $f = $_FILES['portada'];
+            if ($f['error'] !== UPLOAD_ERR_OK) $this->error('Error subiendo portada', 422, 'UPLOAD_ERROR');
+            if ($f['size'] > 5 * 1024 * 1024) $this->error('Portada supera 5MB', 413, 'FILE_TOO_LARGE');
+            $mime = $finfo->file($f['tmp_name']) ?: '';
+            $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!in_array($mime, $allowed, true)) $this->error("Tipo de portada no permitido ($mime)", 415, 'BAD_MIME');
+            $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
+            $coverFilename = $sanitize($f['name'] ?: "portada.$ext", $ext);
+            if (!@move_uploaded_file($f['tmp_name'], $coversDir . DIRECTORY_SEPARATOR . $coverFilename)) {
+                $this->error('No se pudo guardar la portada', 500, 'MOVE_FAIL');
             }
-
-            // 6) Si viene nueva PORTADA
-            if ($isMultipart && isset($_FILES['portada']) && $_FILES['portada']['error'] !== UPLOAD_ERR_NO_FILE) {
-                $f = $_FILES['portada'];
-                if ($f['error'] !== UPLOAD_ERR_OK) $this->error('Error subiendo portada', 422, 'UPLOAD_ERROR');
-                if ($f['size'] > $maxBytesCover)  $this->error('Portada supera el tamaño permitido', 413, 'FILE_TOO_LARGE');
-
-                $mime = $finfo->file($f['tmp_name']) ?: '';
-                $allowed = ['image/jpeg', 'image/png', 'image/webp'];
-                if (!in_array($mime, $allowed, true)) $this->error("Tipo de portada no permitido ($mime)", 415, 'BAD_MIME');
-                $ext = $mime === 'image/png' ? 'png' : ($mime === 'image/webp' ? 'webp' : 'jpg');
-
-                $newCoverFilename = $sanitize($f['name'] ?: "portada.$ext", $ext);
-                if (!@move_uploaded_file($f['tmp_name'], $coversDir . DIRECTORY_SEPARATOR . $newCoverFilename)) {
-                    $this->error('No se pudo guardar la portada', 500, 'MOVE_FAIL');
-                }
+            // elimina portada anterior si existía
+            if (!empty($book['portada'])) {
+                @unlink($coversDir . DIRECTORY_SEPARATOR . $book['portada']);
             }
-
-            // 7) Construir UPDATE (metadata + archivos si hay)
-            $fields = [
-                'titulo',
-                'autor',
-                'editorial',
-                'edicion',
-                'tomo',
-                'tipo_libro',
-                'isbn',
-                'paginas',
-                'anio',
-                'temas_relacionados',
-                'tags'
-            ];
-            $sets = [];
-            $params = [':id' => $id, ':ies' => $this->tenantId];
-
-            foreach ($fields as $f) {
-                if (array_key_exists($f, $in)) {
-                    $sets[] = "$f = :$f";
-                    $params[":$f"] = in_array($f, ['paginas', 'anio'], true)
-                        ? (int)$in[$f]
-                        : trim((string)$in[$f]);
-                }
-            }
-            if ($newBookFilename) {
-                $sets[] = "libro = :libro";
-                $params[':libro']   = $newBookFilename;
-            }
-            if ($newCoverFilename) {
-                $sets[] = "portada = :portada";
-                $params[':portada'] = $newCoverFilename;
-            }
-
-            if (empty($sets)) {
-                // nada que actualizar
-                $out = $this->mapRow($row);
-                return $this->json(['ok' => true, 'updated' => 0, 'book' => $out], 200);
-            }
-
-            $sql = "UPDATE biblioteca_libros
-                SET " . implode(', ', $sets) . "
-                WHERE id = :id AND id_ies = :ies";
-            $up = $this->db->prepare($sql);
-            $up->execute($params);
-
-            // 8) Remueve archivos antiguos si se reemplazaron (best-effort)
-            if ($newBookFilename && !empty($row['libro']))   @unlink($booksDir  . DIRECTORY_SEPARATOR . $row['libro']);
-            if ($newCoverFilename && !empty($row['portada'])) @unlink($coversDir . DIRECTORY_SEPARATOR . $row['portada']);
-
-            // 9) Devuelve libro actualizado
-            $st2 = $this->db->prepare("SELECT * FROM biblioteca_libros WHERE id=?");
-            $st2->execute([$id]);
-            $r2 = $st2->fetch(\PDO::FETCH_ASSOC);
-            return $this->json(['ok' => true, 'updated' => 1, 'book' => $this->mapRow($r2)], 200);
-        } catch (\Throwable $e) {
-            // Limpia archivos recién subidos si hubo error
-            if ($newBookFilename)  @unlink($booksDir  . DIRECTORY_SEPARATOR . $newBookFilename);
-            if ($newCoverFilename) @unlink($coversDir . DIRECTORY_SEPARATOR . $newCoverFilename);
-            return $this->json(['ok' => false, 'error' => ['code' => 'EXCEPTION', 'message' => $e->getMessage()]], 500);
+            $set[] = "portada = :portada";
+            $params[':portada'] = $coverFilename;
         }
+
+        // Libro
+        if ($isMultipart && isset($_FILES['libro']) && $_FILES['libro']['error'] !== UPLOAD_ERR_NO_FILE) {
+            $f = $_FILES['libro'];
+            if ($f['error'] !== UPLOAD_ERR_OK) $this->error('Error subiendo libro', 422, 'UPLOAD_ERROR');
+            if ($f['size'] > 25 * 1024 * 1024) $this->error('Libro supera 25MB', 413, 'FILE_TOO_LARGE');
+            if (!is_uploaded_file($f['tmp_name'])) $this->error('Upload inválido', 422, 'NOT_UPLOADED');
+            $mime = $finfo->file($f['tmp_name']) ?: '';
+            $allowed = ['application/pdf', 'application/epub+zip'];
+            if (!in_array($mime, $allowed, true)) $this->error("Tipo de archivo no permitido ($mime)", 415, 'BAD_MIME');
+            $ext = $mime === 'application/pdf' ? 'pdf' : 'epub';
+            $bookFilename = $sanitize($f['name'] ?: "libro.$ext", $ext);
+            if (!@move_uploaded_file($f['tmp_name'], $booksDir . DIRECTORY_SEPARATOR . $bookFilename)) {
+                $this->error('No se pudo guardar el libro', 500, 'MOVE_FAIL');
+            }
+            // elimina archivo anterior si existía
+            if (!empty($book['libro'])) {
+                @unlink($booksDir . DIRECTORY_SEPARATOR . $book['libro']);
+            }
+            $set[] = "libro = :libro";
+            $params[':libro'] = $bookFilename;
+        }
+
+        if (empty($set)) {
+            // nada que actualizar
+            return $this->json(['ok' => true, 'message' => 'Sin cambios'], 200);
+        }
+
+        // 6) Ejecuta UPDATE
+        $sql = "UPDATE biblioteca_libros SET " . implode(', ', $set) . " WHERE id = :id AND id_ies = :id_ies";
+        $params[':id'] = $id;
+        $params[':id_ies'] = $this->tenantId;
+        $up = $this->db->prepare($sql);
+        $up->execute($params);
+
+        // 7) Respuesta con datos actualizados
+        $cfg = $this->cfg();
+        $st = $this->db->prepare("SELECT * FROM biblioteca_libros WHERE id=?");
+        $st->execute([$id]);
+        $r = $st->fetch(\PDO::FETCH_ASSOC);
+
+        $payload = [
+            'ok' => true,
+            'data' => [
+                'id'          => (int)$r['id'],
+                'owner_ies'   => (int)$r['id_ies'],
+                'titulo'      => $r['titulo'],
+                'autor'       => $r['autor'],
+                'isbn'        => $r['isbn'],
+                'tipo_libro'  => $r['tipo_libro'],
+                'anio'        => $r['anio'],
+                'portada_url' => $r['portada'] ? ($cfg['library']['covers_base_url'] . '/' . $r['portada']) : null,
+                'archivo_url' => $cfg['library']['files_base_url'] . '/' . $r['libro'],
+            ]
+        ];
+        return $this->respondIdem($payload, 200);
     }
 }
