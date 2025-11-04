@@ -409,16 +409,17 @@ class LibraryController extends BaseApiController
     }
 
     /* ========== GET /api/library/adopted ========== */
+    /* ========== GET /api/library/adopted ========== */
     public function adopted()
     {
         $this->requireApiKey();
 
-        // Paginación
-        $page    = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = max(1, min(100, (int)($_GET['per_page'] ?? 10)));
-        $offset  = ($page - 1) * $perPage;
+        // --- paginación ---
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $per  = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
+        $off  = ($page - 1) * $per;
 
-        // Filtros académicos
+        // --- filtros académicos ---
         $p = [
             'id_programa_estudio' => isset($_GET['id_programa_estudio']) ? (int)$_GET['id_programa_estudio'] : null,
             'id_plan'             => isset($_GET['id_plan']) ? (int)$_GET['id_plan'] : null,
@@ -426,9 +427,12 @@ class LibraryController extends BaseApiController
             'id_semestre'         => isset($_GET['id_semestre']) ? (int)$_GET['id_semestre'] : null,
             'id_unidad_didactica' => isset($_GET['id_unidad_didactica']) ? (int)$_GET['id_unidad_didactica'] : null,
         ];
-        $q = trim($_GET['q'] ?? '');
 
-        // WHERE + binds posicionales
+        // --- búsqueda libre (titulo/autor/temas_relacionados) ---
+        $search = trim($_GET['search'] ?? '');
+        $like   = ($search !== '') ? '%' . $search . '%' : null;
+
+        // WHERE dinámico (solo placeholders posicionales para evitar HY093)
         $where = ["v.id_ies = ?"];
         $bind  = [$this->tenantId];
 
@@ -438,52 +442,51 @@ class LibraryController extends BaseApiController
                 $bind[] = $val;
             }
         }
-        if ($q !== '') {
-            $where[] = "(bl.titulo LIKE ? OR bl.autor LIKE ?)";
-            $like = "%{$q}%";
+        if ($like !== null) {
+            $where[] = "(bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
+            $bind[] = $like;
             $bind[] = $like;
             $bind[] = $like;
         }
-        $whereSql = "WHERE " . implode(' AND ', $where);
+        $W = implode(' AND ', $where);
 
-        // 1) Conteo total
+        // --- total (para paginación) ---
         $sqlCount = "
-        SELECT COUNT(*)
-        FROM biblioteca_vinculos v
-        JOIN biblioteca_libros bl ON bl.id = v.id_libro
-        $whereSql
+        SELECT COUNT(*) AS t
+          FROM biblioteca_vinculos v
+          JOIN biblioteca_libros bl ON bl.id = v.id_libro
+         WHERE $W
     ";
-        $stCount = $this->db->prepare($sqlCount);
-        $i = 1;
-        foreach ($bind as $val) {
-            $stCount->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        $st = $this->db->prepare($sqlCount);
+        // bind posicional
+        foreach ($bind as $i => $val) {
+            $st->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
-        $stCount->execute();
-        $total = (int)$stCount->fetchColumn();
+        $st->execute();
+        $total = (int)($st->fetchColumn() ?: 0);
 
-        // 2) Página de datos (LIMIT/OFFSET incrustados como enteros)
-        $limit  = (int)$perPage;
-        $offsetI = (int)$offset;
-        $sqlData = "
-        SELECT 
-            bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
-            v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
-        FROM biblioteca_vinculos v
-        JOIN biblioteca_libros bl ON bl.id = v.id_libro
-        $whereSql
-        ORDER BY bl.id DESC
-        LIMIT {$limit} OFFSET {$offsetI}
-    ";
-        $st = $this->db->prepare($sqlData);
-        $i = 1;
-        foreach ($bind as $val) {
-            $st->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        // --- datos de la página ---
+        // Nota: interpolamos off/per ya casteados a int para evitar problemas con LIMIT en PDO.
+        $sql = "
+      SELECT 
+        bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
+        v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
+      FROM biblioteca_vinculos v
+      JOIN biblioteca_libros bl ON bl.id = v.id_libro
+      WHERE $W
+      ORDER BY bl.id DESC
+      LIMIT " . (int)$off . ", " . (int)$per;
+
+        $st = $this->db->prepare($sql);
+        foreach ($bind as $i => $val) {
+            $st->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
+        // mapear + adjuntar cadena académica
         $data = array_map(function (array $r): array {
-            $row = $this->mapRow($r);
+            $row = $this->mapRow($r);   // usa covers_base_url / files_base_url del cfg
             $row['vinculo'] = [
                 'id_programa_estudio' => (int)($r['id_programa_estudio'] ?? 0),
                 'id_plan'             => (int)($r['id_plan'] ?? 0),
@@ -498,11 +501,12 @@ class LibraryController extends BaseApiController
             'data' => $data,
             'pagination' => [
                 'page'     => $page,
-                'per_page' => $perPage,
+                'per_page' => $per,
                 'total'    => $total
             ]
         ], 200);
     }
+
 
 
     public function update($id)
