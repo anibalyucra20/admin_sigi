@@ -413,7 +413,7 @@ class LibraryController extends BaseApiController
     {
         $this->requireApiKey();
 
-        // Paginación segura
+        // Paginación
         $page    = max(1, (int)($_GET['page'] ?? 1));
         $perPage = max(1, min(100, (int)($_GET['per_page'] ?? 10)));
         $offset  = ($page - 1) * $perPage;
@@ -426,58 +426,59 @@ class LibraryController extends BaseApiController
             'id_semestre'         => isset($_GET['id_semestre']) ? (int)$_GET['id_semestre'] : null,
             'id_unidad_didactica' => isset($_GET['id_unidad_didactica']) ? (int)$_GET['id_unidad_didactica'] : null,
         ];
-        $q = trim($_GET['q'] ?? ''); // búsqueda opcional por titulo/autor
+        $q = trim($_GET['q'] ?? '');
 
+        // WHERE + binds posicionales
         $where = ["v.id_ies = ?"];
         $bind  = [$this->tenantId];
 
         foreach ($p as $col => $val) {
-            if ($val) { $where[] = "v.$col = ?"; $bind[] = $val; }
+            if ($val) {
+                $where[] = "v.$col = ?";
+                $bind[] = $val;
+            }
         }
         if ($q !== '') {
             $where[] = "(bl.titulo LIKE ? OR bl.autor LIKE ?)";
             $like = "%{$q}%";
-            $bind[] = $like; $bind[] = $like;
+            $bind[] = $like;
+            $bind[] = $like;
         }
         $whereSql = "WHERE " . implode(' AND ', $where);
 
-        // 1) Conteo total (mismas condiciones)
+        // 1) Conteo total
         $sqlCount = "
-            SELECT COUNT(*)
-            FROM biblioteca_vinculos v
-            JOIN biblioteca_libros bl ON bl.id = v.id_libro
-            $whereSql
-        ";
+        SELECT COUNT(*)
+        FROM biblioteca_vinculos v
+        JOIN biblioteca_libros bl ON bl.id = v.id_libro
+        $whereSql
+    ";
         $stCount = $this->db->prepare($sqlCount);
-        // bind de COUNT (todos STR/INT da igual aquí)
-        foreach ($bind as $i => $val) {
-            $stCount->bindValue($i+1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        $i = 1;
+        foreach ($bind as $val) {
+            $stCount->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
         $stCount->execute();
         $total = (int)$stCount->fetchColumn();
 
-        // 2) Página de datos
+        // 2) Página de datos (LIMIT/OFFSET incrustados como enteros)
+        $limit  = (int)$perPage;
+        $offsetI = (int)$offset;
         $sqlData = "
-            SELECT 
-                bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
-                v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
-            FROM biblioteca_vinculos v
-            JOIN biblioteca_libros bl ON bl.id = v.id_libro
-            $whereSql
-            ORDER BY bl.id DESC
-            LIMIT :limit OFFSET :offset
-        ";
+        SELECT 
+            bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
+            v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
+        FROM biblioteca_vinculos v
+        JOIN biblioteca_libros bl ON bl.id = v.id_libro
+        $whereSql
+        ORDER BY bl.id DESC
+        LIMIT {$limit} OFFSET {$offsetI}
+    ";
         $st = $this->db->prepare($sqlData);
-
-        // bind de filtros
-        $pos = 1;
+        $i = 1;
         foreach ($bind as $val) {
-            $st->bindValue($pos++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            $st->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
-        // bind de paginación (INT obligatorio)
-        $st->bindValue(':limit',  $perPage, \PDO::PARAM_INT);
-        $st->bindValue(':offset', $offset,  \PDO::PARAM_INT);
-
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -502,6 +503,7 @@ class LibraryController extends BaseApiController
             ]
         ], 200);
     }
+
 
     public function update($id)
     {
