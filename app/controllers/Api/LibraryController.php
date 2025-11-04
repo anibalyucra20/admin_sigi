@@ -440,11 +440,17 @@ class LibraryController extends BaseApiController
     /* ========== GET /api/library/adopted ========== */
     // App/Controllers/Api/LibraryController.php
     // App/Controllers/Api/LibraryController.php
+    /* ========== GET /api/library/adopted ========== */
     public function adopted()
     {
         $this->requireApiKey();
 
-        // (opcional) lee filtros si quieres filtrar en servidor
+        // Paginación segura
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = max(1, min(100, (int)($_GET['per_page'] ?? 10)));
+        $offset  = ($page - 1) * $perPage;
+
+        // Filtros académicos
         $p = [
             'id_programa_estudio' => isset($_GET['id_programa_estudio']) ? (int)$_GET['id_programa_estudio'] : null,
             'id_plan'             => isset($_GET['id_plan']) ? (int)$_GET['id_plan'] : null,
@@ -452,34 +458,63 @@ class LibraryController extends BaseApiController
             'id_semestre'         => isset($_GET['id_semestre']) ? (int)$_GET['id_semestre'] : null,
             'id_unidad_didactica' => isset($_GET['id_unidad_didactica']) ? (int)$_GET['id_unidad_didactica'] : null,
         ];
+        $q = trim($_GET['q'] ?? ''); // búsqueda opcional por titulo/autor
 
         $where = ["v.id_ies = ?"];
         $bind  = [$this->tenantId];
+
         foreach ($p as $col => $val) {
-            if ($val) {
-                $where[] = "v.$col = ?";
-                $bind[] = $val;
-            }
+            if ($val) { $where[] = "v.$col = ?"; $bind[] = $val; }
         }
+        if ($q !== '') {
+            $where[] = "(bl.titulo LIKE ? OR bl.autor LIKE ?)";
+            $like = "%{$q}%";
+            $bind[] = $like; $bind[] = $like;
+        }
+        $whereSql = "WHERE " . implode(' AND ', $where);
 
-        $sql = "
-      SELECT 
-        bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
-        v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
-      FROM biblioteca_vinculos v
-      JOIN biblioteca_libros bl ON bl.id = v.id_libro
-      WHERE " . implode(' AND ', $where) . "
-      ORDER BY bl.id DESC
-      LIMIT 1000
-    ";
+        // 1) Conteo total (mismas condiciones)
+        $sqlCount = "
+            SELECT COUNT(*)
+            FROM biblioteca_vinculos v
+            JOIN biblioteca_libros bl ON bl.id = v.id_libro
+            $whereSql
+        ";
+        $stCount = $this->db->prepare($sqlCount);
+        // bind de COUNT (todos STR/INT da igual aquí)
+        foreach ($bind as $i => $val) {
+            $stCount->bindValue($i+1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+        $stCount->execute();
+        $total = (int)$stCount->fetchColumn();
 
-        $st = $this->db->prepare($sql);
-        foreach ($bind as $i => $val) $st->bindValue($i + 1, $val, \PDO::PARAM_INT);
+        // 2) Página de datos
+        $sqlData = "
+            SELECT 
+                bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
+                v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
+            FROM biblioteca_vinculos v
+            JOIN biblioteca_libros bl ON bl.id = v.id_libro
+            $whereSql
+            ORDER BY bl.id DESC
+            LIMIT :limit OFFSET :offset
+        ";
+        $st = $this->db->prepare($sqlData);
+
+        // bind de filtros
+        $pos = 1;
+        foreach ($bind as $val) {
+            $st->bindValue($pos++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+        // bind de paginación (INT obligatorio)
+        $st->bindValue(':limit',  $perPage, \PDO::PARAM_INT);
+        $st->bindValue(':offset', $offset,  \PDO::PARAM_INT);
+
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
         $data = array_map(function (array $r): array {
-            $row = $this->mapRow($r);   // ← sin $cfg
+            $row = $this->mapRow($r);
             $row['vinculo'] = [
                 'id_programa_estudio' => (int)($r['id_programa_estudio'] ?? 0),
                 'id_plan'             => (int)($r['id_plan'] ?? 0),
@@ -490,7 +525,14 @@ class LibraryController extends BaseApiController
             return $row;
         }, $rows);
 
-        return $this->json(['data' => $data]);
+        return $this->json([
+            'data' => $data,
+            'pagination' => [
+                'page'     => $page,
+                'per_page' => $perPage,
+                'total'    => $total
+            ]
+        ], 200);
     }
 
     public function update($id)
