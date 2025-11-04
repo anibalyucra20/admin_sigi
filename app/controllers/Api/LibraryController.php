@@ -23,8 +23,6 @@ class LibraryController extends BaseApiController
         ];
     }
 
-
-
     /* ========== POST /api/library/upload (multipart/form-data) ========== */
     public function upload()
     {
@@ -77,8 +75,7 @@ class LibraryController extends BaseApiController
         };
 
         try {
-            // 1) LIBRO (multipart) -> $_FILES['libro']
-            // 1) LIBRO (multipart) -> $_FILES['libro']
+            // 1) LIBRO (multipart)
             if ($isMultipart && isset($_FILES['libro']) && $_FILES['libro']['error'] !== UPLOAD_ERR_NO_FILE) {
                 $f = $_FILES['libro'];
                 if ($f['error'] !== UPLOAD_ERR_OK) {
@@ -88,12 +85,10 @@ class LibraryController extends BaseApiController
                     return $this->json(['ok' => false, 'error' => ['code' => 'FILE_TOO_LARGE', 'message' => 'Libro supera el tamaño permitido']], 413);
                 }
 
-                // Validar que realmente es un upload
                 if (!is_uploaded_file($f['tmp_name'])) {
                     return $this->json(['ok' => false, 'error' => ['code' => 'NOT_UPLOADED', 'message' => 'El archivo no es una subida válida (multipart)']], 422);
                 }
 
-                // MIME
                 $mime = $finfo->file($f['tmp_name']) ?: '';
                 $allowed = ['application/pdf', 'application/epub+zip'];
                 if (!in_array($mime, $allowed, true)) {
@@ -101,11 +96,9 @@ class LibraryController extends BaseApiController
                 }
                 $ext = $mime === 'application/pdf' ? 'pdf' : 'epub';
 
-                // Nombre saneado + ruta
                 $bookFilename = $sanitize($f['name'] ?: "libro.$ext", $ext);
                 $dest = $booksDir . DIRECTORY_SEPARATOR . $bookFilename;
 
-                // Checks previos
                 clearstatcache(true, $booksDir);
                 if (!is_dir($booksDir)) {
                     return $this->json(['ok' => false, 'error' => ['code' => 'DIR_MISSING', 'message' => 'Directorio /public/books no existe']], 500);
@@ -114,7 +107,6 @@ class LibraryController extends BaseApiController
                     return $this->json(['ok' => false, 'error' => ['code' => 'DIR_NOT_WRITABLE', 'message' => '/public/books no es escribible']], 500);
                 }
 
-                // Mover y diagnosticar si falla
                 if (!@move_uploaded_file($f['tmp_name'], $dest)) {
                     $err = error_get_last()['message'] ?? 'desconocido';
                     return $this->json([
@@ -134,8 +126,7 @@ class LibraryController extends BaseApiController
                 }
             }
 
-
-            // 2) PORTADA (multipart) -> $_FILES['portada'] (opcional)
+            // 2) PORTADA (multipart) opcional
             if ($isMultipart && isset($_FILES['portada']) && $_FILES['portada']['error'] !== UPLOAD_ERR_NO_FILE) {
                 $f = $_FILES['portada'];
                 if ($f['error'] !== UPLOAD_ERR_OK) {
@@ -156,13 +147,9 @@ class LibraryController extends BaseApiController
                 }
             }
 
-            // 3) Modo JSON: se aceptan cadenas (si no subiste archivos)
-            if (!$bookFilename) {
-                $bookFilename = substr(basename(trim($in['libro'] ?? '')), 0, 100);
-            }
-            if (!$coverFilename) {
-                $coverFilename = substr(basename(trim($in['portada'] ?? '')), 0, 100);
-            }
+            // 3) Modo JSON: nombres de archivo
+            if (!$bookFilename)  $bookFilename  = substr(basename(trim($in['libro'] ?? '')), 0, 100);
+            if (!$coverFilename) $coverFilename = substr(basename(trim($in['portada'] ?? '')), 0, 100);
             if ($bookFilename === '') {
                 return $this->json(['ok' => false, 'error' => ['code' => 'MISSING_BOOK', 'message' => 'Falta archivo de libro (libro)']], 422);
             }
@@ -193,7 +180,7 @@ class LibraryController extends BaseApiController
 
             $id = (int)$this->db->lastInsertId();
 
-            // Adoptar inmediatamente solo si viene la cadena completa
+            // Adoptar inmediatamente si viene la cadena completa
             $keys = ['id_programa_estudio', 'id_plan', 'id_modulo_formativo', 'id_semestre', 'id_unidad_didactica'];
             $hasChain = !array_diff_key(array_flip($keys), $in);
 
@@ -227,11 +214,9 @@ class LibraryController extends BaseApiController
                 'duplicated' => $duplicated,
             ], 201);
         } catch (\Throwable $e) {
-            // que no quede 500 vacío
             return $this->json(['ok' => false, 'error' => ['code' => 'EXCEPTION', 'message' => $e->getMessage()]], 500);
         }
     }
-
 
     /* ========== POST /api/library/adopt/{libro_id} ========== */
     public function adopt($libroId)
@@ -261,12 +246,6 @@ class LibraryController extends BaseApiController
             if ($body[$k] <= 0) $this->error("$k inválido", 422, 'VALIDATION');
         }
 
-        // 3) Si ya es propio, puedes considerar esto como ya “vinculado” lógicamente
-        //    (negocio original: retornar duplicated=true)
-        /*if ((int)$ownerIes === (int)$this->tenantId) {
-            return $this->respondIdem(['ok' => true, 'message' => 'Ya es propio', 'duplicated' => true], 200);
-        }*/
-
         // 4) Insert idempotente en biblioteca_vinculos
         $sql = "INSERT INTO biblioteca_vinculos
             (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
@@ -284,11 +263,10 @@ class LibraryController extends BaseApiController
                 $body['id_unidad_didactica'],
             ]);
 
-            $duplicated = ($st->rowCount() === 0); // ya existía esa misma cadena
+            $duplicated = ($st->rowCount() === 0);
             $payload = ['ok' => true, 'adopted_libro_id' => $libroId, 'duplicated' => $duplicated];
             return $this->respondIdem($payload, $duplicated ? 200 : 201);
         } catch (\PDOException $e) {
-            // Si tienes FKs, puedes mapear 1452 (foreign key) a mensaje legible
             $sqlState = $e->errorInfo[1] ?? null;
             if ($sqlState === 1452) {
                 return $this->json(['ok' => false, 'error' => ['code' => 'FK_VIOLATION', 'message' => 'Alguna referencia académica no existe']], 422);
@@ -296,7 +274,6 @@ class LibraryController extends BaseApiController
             return $this->json(['ok' => false, 'error' => ['code' => 'DB_ERROR', 'message' => $e->getMessage()]], 500);
         }
     }
-
 
     /* ========== DELETE /api/library/adopt/{libro_id} ========== */
     public function unadopt($libroId)
@@ -378,9 +355,6 @@ class LibraryController extends BaseApiController
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
     }
 
-
-
-
     /* ========== GET /api/library/search (global) ========== */
     public function search()
     {
@@ -399,7 +373,6 @@ class LibraryController extends BaseApiController
             $sql .= " AND (titulo LIKE :q1 OR autor LIKE :q2 OR temas_relacionados LIKE :q3)";
         }
 
-        // IMPORTANTE: evitar placeholders en LIMIT para no mezclar nombrados/repetidos
         $sql .= " ORDER BY id DESC LIMIT " . (int)$off . ", " . (int)$per;
 
         $st = $this->db->prepare($sql);
@@ -418,8 +391,6 @@ class LibraryController extends BaseApiController
         return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
     }
 
-
-
     /* ========== GET /api/library/show/{id} ========== */
     public function show($id)
     {
@@ -437,9 +408,6 @@ class LibraryController extends BaseApiController
         $this->json($r, 200);
     }
 
-    /* ========== GET /api/library/adopted ========== */
-    // App/Controllers/Api/LibraryController.php
-    // App/Controllers/Api/LibraryController.php
     /* ========== GET /api/library/adopted ========== */
     public function adopted()
     {
@@ -644,7 +612,6 @@ class LibraryController extends BaseApiController
         }
 
         if (empty($set)) {
-            // nada que actualizar
             return $this->json(['ok' => true, 'message' => 'Sin cambios'], 200);
         }
 
