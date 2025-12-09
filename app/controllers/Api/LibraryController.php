@@ -18,6 +18,8 @@ class LibraryController extends BaseApiController
             'isbn'        => $r['isbn'],
             'tipo_libro'  => $r['tipo_libro'],
             'anio'        => $r['anio'],
+            'id_programa_estudio'        => $r['id_programa_estudio'],
+            'id_unidad_didactica'        => $r['id_unidad_didactica'],
             'portada_url' => !empty($r['portada']) ? ($cfg['library']['covers_base_url'] . '/' . $r['portada']) : null,
             'archivo_url' => $cfg['library']['files_base_url'] . '/' . $r['libro'],
         ];
