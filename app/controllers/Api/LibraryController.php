@@ -684,12 +684,13 @@ class LibraryController extends BaseApiController
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $orderField   = implode(',', $ids); // ints ya saneados
 
-            $sql = "SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
-            v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
-            FROM biblioteca_vinculos v
-            JOIN biblioteca_libros bl ON bl.id = v.id_libro
-            WHERE id IN ($placeholders)
-            ORDER BY FIELD(id, $orderField)
+            $sql = "SELECT 
+        bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
+        v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
+      FROM biblioteca_vinculos v
+      JOIN biblioteca_libros bl ON bl.id = v.id_libro
+             WHERE id IN ($placeholders)
+             ORDER BY FIELD(id, $orderField)
         ";
             $st = $this->db->prepare($sql);
             foreach ($ids as $i => $v) $st->bindValue($i + 1, $v, \PDO::PARAM_INT);
