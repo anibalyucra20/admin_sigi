@@ -688,8 +688,8 @@ class LibraryController extends BaseApiController
              v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
              FROM biblioteca_libros bl
              JOIN biblioteca_vinculos v ON bl.id = v.id_libro
-             WHERE id IN ($placeholders)
-             ORDER BY FIELD(id, $orderField)
+             WHERE bl.id IN ($placeholders)
+             ORDER BY FIELD(bl.id, $orderField)
         ";
             $st = $this->db->prepare($sql);
             foreach ($ids as $i => $v) $st->bindValue($i + 1, $v, \PDO::PARAM_INT);
