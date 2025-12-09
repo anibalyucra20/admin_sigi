@@ -684,11 +684,8 @@ class LibraryController extends BaseApiController
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $orderField   = implode(',', $ids); // ints ya saneados
 
-            $sql = "SELECT 
-        bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio,
-        v.id_programa_estudio, v.id_plan, v.id_modulo_formativo, v.id_semestre, v.id_unidad_didactica
-      FROM biblioteca_vinculos v
-      JOIN biblioteca_libros bl ON bl.id = v.id_libro
+            $sql = "SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
+              FROM biblioteca_libros
              WHERE id IN ($placeholders)
              ORDER BY FIELD(id, $orderField)
         ";
