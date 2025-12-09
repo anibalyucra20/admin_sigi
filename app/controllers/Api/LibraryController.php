@@ -650,4 +650,62 @@ class LibraryController extends BaseApiController
         ];
         return $this->respondIdem($payload, 200);
     }
+
+
+
+    /* ========== GET /api/library/batch?ids=1,2,3 ========== */
+    public function batch()
+    {
+        $this->requireApiKey();
+
+        // 1) Parseo y saneo de ids
+        $idsParam = trim((string)($_GET['ids'] ?? ''));
+        if ($idsParam === '') {
+            return $this->json(['data' => []], 200);
+        }
+
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', explode(',', $idsParam)),
+            fn($v) => $v > 0
+        )));
+        if (!$ids) {
+            return $this->json(['data' => []], 200);
+        }
+
+        // Limitar para evitar cargas excesivas
+        $max = 50;
+        if (count($ids) > $max) {
+            $ids = array_slice($ids, 0, $max);
+        }
+
+        try {
+            // 2) Consulta por lote
+            // Usamos ORDER BY FIELD para respetar el orden solicitado
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $orderField   = implode(',', $ids); // ints ya saneados
+
+            $sql = "
+            SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
+              FROM biblioteca_libros
+             WHERE id IN ($placeholders)
+             ORDER BY FIELD(id, $orderField)
+        ";
+            $st = $this->db->prepare($sql);
+            foreach ($ids as $i => $v) $st->bindValue($i + 1, $v, \PDO::PARAM_INT);
+            $st->execute();
+
+            $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
+            $cfg  = $this->cfg();
+
+            // 3) Mapear filas al formato público
+            $data = array_map(fn($r) => $this->mapRow($r, $cfg), $rows);
+
+            return $this->json(['data' => $data], 200);
+        } catch (\Throwable $e) {
+            return $this->json([
+                'ok'    => false,
+                'error' => ['code' => 'DB_ERROR', 'message' => $e->getMessage()]
+            ], 500);
+        }
+    }
 }
