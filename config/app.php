@@ -1,7 +1,10 @@
 <?php
 return [
   'library' => [
-    'covers_base_url' => getenv('COVERS_BASE_URL') ?: BASE_URL.'/covers',
-    'files_base_url'  => getenv('FILES_BASE_URL')  ?: BASE_URL.'/books',
+    'covers_base_url' => getenv('COVERS_BASE_URL') ?: BASE_URL . '/covers',
+    'files_base_url'  => getenv('FILES_BASE_URL')  ?: BASE_URL . '/books',
+  ],
+  'cpe' => [
+    'base_url' => getenv('CPE_BASE_URL') ?: BASE_URL . '/cpe',
   ],
 ];
