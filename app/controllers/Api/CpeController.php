@@ -660,20 +660,15 @@ XML;
 
     private function sunatWsdl(string $modo): string
     {
-        // En lugar de devolver la URL de SUNAT, devolvemos la ruta al archivo local
-        // Esto evita el error "Couldn't load from..."
-        $path = __DIR__ . '/../../../public/Wsdl/billService.wsdl';
-
-        if (!file_exists($path)) {
-            // Si el archivo no está, podrías intentar la URL como fallback, 
-            // pero lo ideal es que siempre sea local.
-            return ($modo === 'prod')
-                ? 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService?wsdl'
-                : 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService?wsdl';
+        $path = __DIR__ . '/../../Wsdl/billService.wsdl';
+        if (is_file($path)) return $path;
+        // Fallback remoto (pero ya sabes que puede fallar)
+        if (strtolower($modo) === 'prod') {
+            return 'https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService?wsdl';
         }
-
-        return $path;
+        return 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService?wsdl';
     }
+
 
     private function loadSunatCredencial(int $idIes): array
     {
@@ -946,7 +941,17 @@ XML;
         $z = $this->zipXmlBase64($xmlSigned, $baseName);
 
         // 6) SOAP sendBill
-        $wsdl = $this->sunatWsdl($modo);
+        //$wsdl = $this->sunatWsdl($modo);
+
+        $wsdlLocal = __DIR__ . '/../../Wsdl/billService.wsdl'; // AJUSTA si tu ruta es distinta
+
+        if (!is_file($wsdlLocal)) {
+            $this->error('No existe el WSDL local: ' . $wsdlLocal, 500, 'WSDL_LOCAL_MISSING');
+        }
+
+        $wsdl = $wsdlLocal; // <-- fuerza local sí o sí
+        error_log("SOAP WSDL USED => " . $wsdl);
+
 
         // Definir el endpoint real según el modo
         $endpoint = ($modo === 'prod')
