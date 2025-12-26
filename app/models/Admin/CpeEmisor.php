@@ -52,6 +52,9 @@ class CpeEmisor extends Model
 
         $id    = !empty($d['id']) ? (int)$d['id'] : null;
         $idIes = (int)($d['id_ies'] ?? 0);
+        if ($idIes <= 0) {
+            throw new \InvalidArgumentException('IES es obligatorio.');
+        }
 
         // ✅ Respetar UNIQUE uq_cpe_emisor_ies (id_ies)
         // Si es nuevo y ya existe -> error

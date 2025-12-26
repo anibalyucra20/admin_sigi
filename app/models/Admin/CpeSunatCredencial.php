@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models\Admin;
 
 use Core\Model;
@@ -26,6 +27,41 @@ class CpeSunatCredencial extends Model
         if ($cipher === false) throw new \RuntimeException('No se pudo cifrar.');
         return base64_encode($iv . $tag . $cipher);
     }
+    private function dec(?string $payloadB64): ?string
+    {
+        if ($payloadB64 === null || $payloadB64 === '') return null;
+
+        $raw = base64_decode($payloadB64, true);
+        if ($raw === false || strlen($raw) < (12 + 16 + 1)) {
+            throw new \RuntimeException('Payload cifrado inválido.');
+        }
+
+        $iv  = substr($raw, 0, 12);
+        $tag = substr($raw, 12, 16);
+        $cipher = substr($raw, 28);
+
+        $key = hash('sha256', $this->appKey(), true);
+        $plain = openssl_decrypt($cipher, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+        if ($plain === false) throw new \RuntimeException('No se pudo descifrar.');
+        return $plain;
+    }
+
+    public function getSecretsByIes(int $idIes): ?array
+    {
+        $row = $this->findByIes($idIes);
+        if (!$row) return null;
+
+        return [
+            'id_ies'     => (int)$row['id_ies'],
+            'modo'       => (string)$row['modo'],
+            'sol_user'   => (string)$row['sol_user'],
+            'sol_pass'   => $this->dec($row['sol_pass_enc'] ?? null),
+            'cert_pfx'   => $this->dec($row['cert_pfx_enc'] ?? null), // binario
+            'cert_pass'  => $this->dec($row['cert_pass_enc'] ?? null),
+            'activo'     => (int)($row['activo'] ?? 0),
+        ];
+    }
+
 
     public function find(int $id): ?array
     {
@@ -47,7 +83,7 @@ class CpeSunatCredencial extends Model
     {
         $db = static::getDB();
 
-        $modo = in_array($d['modo'], ['beta','prod'], true) ? $d['modo'] : 'beta';
+        $modo = in_array($d['modo'], ['beta', 'prod'], true) ? $d['modo'] : 'beta';
         $solUser = trim((string)$d['sol_user']);
         $idIes = (int)$d['id_ies'];
 
@@ -112,8 +148,14 @@ class CpeSunatCredencial extends Model
         $where = ["1=1"];
         $bind  = [];
 
-        if (!empty($filters['id_ies'])) { $where[] = "c.id_ies=?"; $bind[] = (int)$filters['id_ies']; }
-        if (!empty($filters['modo']))   { $where[] = "c.modo=?";   $bind[] = $filters['modo']; }
+        if (!empty($filters['id_ies'])) {
+            $where[] = "c.id_ies=?";
+            $bind[] = (int)$filters['id_ies'];
+        }
+        if (!empty($filters['modo'])) {
+            $where[] = "c.modo=?";
+            $bind[] = $filters['modo'];
+        }
         if ($filters['activo'] !== null && $filters['activo'] !== '') {
             $where[] = "c.activo=?";
             $bind[] = (int)$filters['activo'];
@@ -135,7 +177,7 @@ class CpeSunatCredencial extends Model
             JOIN ies i ON i.id=c.id_ies
            WHERE $W
            ORDER BY $orderBy $orderDir
-           LIMIT ".(int)$limit." OFFSET ".(int)$offset;
+           LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
         $st = $db->prepare($sql);
         $st->execute($bind);
