@@ -802,6 +802,16 @@ XML;
     //=========================== Firma XML ===========================
     private function signXmlWithPfx(string $xml, string $pfxBinary, string $pfxPass): string
     {
+        $pfxBinary = $this->normalizePfxBinary((string)$pfxBinary);
+
+        if ($pfxBinary === '' || strlen($pfxBinary) < 500) {
+            throw new \RuntimeException('PFX vacío o demasiado pequeño (posible truncado/base64 mal).');
+        }
+
+        error_log("PFX len=" . strlen((string)$pfxBinary));
+        error_log("PFX head=" . substr((string)$pfxBinary, 0, 30));
+
+
         if (!openssl_pkcs12_read($pfxBinary, $certs, $pfxPass)) {
             throw new \RuntimeException('No se pudo leer el PFX (password incorrecto o archivo inválido).');
         }
@@ -941,17 +951,7 @@ XML;
         $z = $this->zipXmlBase64($xmlSigned, $baseName);
 
         // 6) SOAP sendBill
-        //$wsdl = $this->sunatWsdl($modo);
-
-        $wsdlLocal = __DIR__ . '/../../Wsdl/billService.wsdl'; // AJUSTA si tu ruta es distinta
-
-        if (!is_file($wsdlLocal)) {
-            $this->error('No existe el WSDL local: ' . $wsdlLocal, 500, 'WSDL_LOCAL_MISSING');
-        }
-
-        $wsdl = $wsdlLocal; // <-- fuerza local sí o sí
-        error_log("SOAP WSDL USED => " . $wsdl);
-
+        $wsdl = $this->sunatWsdl($modo);
 
         // Definir el endpoint real según el modo
         $endpoint = ($modo === 'prod')
@@ -1468,5 +1468,21 @@ XML;
         $objDSig->appendSignature($extContent);
 
         return $dom->saveXML();
+    }
+
+    private function normalizePfxBinary(string $pfx): string
+    {
+        $pfx = trim($pfx);
+        if ($pfx === '') return '';
+
+        // Si parece base64 (sin caracteres raros) y al decodificar inicia con 0x30 (ASN.1),
+        // lo tratamos como base64.
+        if (preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $pfx)) {
+            $bin = base64_decode($pfx, true);
+            if ($bin !== false && $bin !== '' && ord($bin[0]) === 0x30) {
+                return $bin;
+            }
+        }
+        return $pfx; // ya es binario
     }
 }
