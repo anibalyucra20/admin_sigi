@@ -9,19 +9,22 @@ if (IS_API) {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Headers: Content-Type, X-Api-Key, X-Idempotency-Key');
     header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(204); exit; }
+    if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
 
     // JSON error handling para API:
     set_error_handler(function ($severity, $message, $file, $line) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok'=>false,'error'=>['code'=>'PHP_ERROR','message'=>$message,'file'=>$file,'line'=>$line]], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => false, 'error' => ['code' => 'PHP_ERROR', 'message' => $message, 'file' => $file, 'line' => $line]], JSON_UNESCAPED_UNICODE);
         exit;
     });
     set_exception_handler(function ($ex) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['ok'=>false,'error'=>['code'=>'UNCAUGHT','message'=>$ex->getMessage()]], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['ok' => false, 'error' => ['code' => 'UNCAUGHT', 'message' => $ex->getMessage()]], JSON_UNESCAPED_UNICODE);
         exit;
     });
     register_shutdown_function(function () {
@@ -29,7 +32,7 @@ if (IS_API) {
         if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
             http_response_code(500);
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok'=>false,'error'=>['code'=>'FATAL','message'=>$e['message'],'file'=>$e['file'],'line'=>$e['line']]], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => false, 'error' => ['code' => 'FATAL', 'message' => $e['message'], 'file' => $e['file'], 'line' => $e['line']]], JSON_UNESCAPED_UNICODE);
         }
     });
 }

@@ -8,6 +8,12 @@ class Ies extends Model
 {
     protected $table = 'ies';
 
+    public function getIes(): array
+    {
+        $db = static::getDB();
+        $st = $db->query("SELECT id, nombre_ies FROM ies ORDER BY nombre_ies ASC");
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
     public function getPaginated(string $search, int $length, int $start, int $orderCol, string $orderDir): array
     {
         $orderDir = strtolower($orderDir) === 'desc' ? 'DESC' : 'ASC';

@@ -1,10 +1,4 @@
 <?php require __DIR__ . '/../../layouts/header.php'; ?>
-<?php if (!empty($errores)): ?>
-  <div class="alert alert-danger">
-    <ul><?php foreach($errores as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
-  </div>
-<?php endif; ?>
-
 <div class="card p-2">
   <h4>Nuevo IES</h4>
   <form action="<?= BASE_URL ?>/admin/ies/guardar" method="post" class="card p-4 shadow-sm rounded-3" autocomplete="off">

@@ -112,6 +112,17 @@ endif;
                     <a class="dropdown-item" href="<?= BASE_URL ?>/admin/pagos">Pagos</a>
                   </div>
                 </li>
+                <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle arrow-none" href="#" id="nav-matriculas" role="button"
+                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="mdi mdi-bank-transfer"></i> FACTURACIÓN <div class="arrow-down"></div>
+                  </a>
+                  <div class="dropdown-menu" aria-labelledby="nav-matriculas">
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/cpeEmisores">Emisores</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/cpeCredenciales">Credenciales</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/cpeSeries">Series</a>
+                  </div>
+                </li>
                 <li class="nav-item">
                   <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/suscripcion') !== false ? 'active' : '' ?>"
                     href="<?= BASE_URL ?>/admin/suscripcion">

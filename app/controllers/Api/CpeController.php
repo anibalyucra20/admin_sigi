@@ -2,306 +2,414 @@
 
 namespace App\Controllers\Api;
 
+use PDO;
+
 require_once __DIR__ . '/BaseApiController.php';
 
 class CpeController extends BaseApiController
 {
+    private string $tableDocs   = 'cpe_documentos';
+    private string $tableSeries = 'cpe_series';
+    private string $tableItems  = 'cpe_items';
+
+    /* ===================== Helpers ===================== */
+
+    private function validateUuid(string $uuid): void
+    {
+        $uuid = trim($uuid);
+        if ($uuid === '' || strlen($uuid) > 80) {
+            $this->error('UUID inválido', 422, 'VALIDATION');
+        }
+        if (!preg_match('/^[A-Za-z0-9\-]+$/', $uuid)) {
+            $this->error('UUID inválido', 422, 'VALIDATION');
+        }
+    }
+
+    private function uuidV4(): string
+    {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+        $hex = bin2hex($data);
+
+        return sprintf(
+            '%s-%s-%s-%s-%s',
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20, 12)
+        );
+    }
+
+    private function escapeXml(string $v): string
+    {
+        return htmlspecialchars($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function buildXmlStub(string $tipoDoc, string $serie, int $corr, string $moneda, array $in, string $rucEmisor): string
+    {
+        $cliente = $in['cliente']['nombre'] ?? 'CLIENTE';
+        $corrPad = str_pad((string)$corr, 8, '0', STR_PAD_LEFT);
+
+        // Stub mínimo (luego lo cambiamos por UBL 2.1 + firma)
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<CPE>
+  <EmisorRUC>{$this->escapeXml($rucEmisor)}</EmisorRUC>
+  <TipoDoc>{$this->escapeXml($tipoDoc)}</TipoDoc>
+  <Serie>{$this->escapeXml($serie)}</Serie>
+  <Correlativo>{$this->escapeXml($corrPad)}</Correlativo>
+  <Moneda>{$this->escapeXml($moneda)}</Moneda>
+  <Cliente>{$this->escapeXml((string)$cliente)}</Cliente>
+</CPE>
+XML;
+    }
+
+    private function getIes(int $idIes): array
+    {
+        $st = $this->db->prepare("SELECT id, ruc, nombre_ies, estado FROM ies WHERE id=? LIMIT 1");
+        $st->execute([$idIes]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) $this->error('IES no existe', 401, 'IES_NOT_FOUND');
+        if (($r['estado'] ?? 'activa') !== 'activa') $this->error('IES suspendida', 403, 'IES_SUSPENDED');
+        return $r;
+    }
+
+    private function getDocByUuid(string $uuid): ?array
+    {
+        $st = $this->db->prepare("
+            SELECT id, uuid, id_ies, tipo_doc, serie, correlativo, estado,
+                   xml_path, cdr_path, pdf_path, hash
+              FROM {$this->tableDocs}
+             WHERE uuid = ? AND id_ies = ?
+             LIMIT 1
+        ");
+        $st->execute([$uuid, (int)$this->tenantId]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    }
+
+    /**
+     * Garantiza cpe_series(id_ies,tipo_doc,serie). Devuelve correlativo seguro (FOR UPDATE).
+     */
+    private function nextCorrelativo(int $idIes, string $tipoDoc, string $serie): int
+    {
+        $ins = $this->db->prepare("
+            INSERT INTO {$this->tableSeries} (id_ies, tipo_doc, serie, correlativo_actual, activo, created_at, updated_at)
+            VALUES (?, ?, ?, 0, 1, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE id=id
+        ");
+        $ins->execute([$idIes, $tipoDoc, $serie]);
+
+        $st = $this->db->prepare("
+            SELECT correlativo_actual
+              FROM {$this->tableSeries}
+             WHERE id_ies=? AND tipo_doc=? AND serie=? AND activo=1
+             FOR UPDATE
+        ");
+        $st->execute([$idIes, $tipoDoc, $serie]);
+
+        $cur = $st->fetchColumn();
+        if ($cur === false) {
+            $this->error('Serie no existe o no activa', 422, 'SERIE_NOT_ACTIVE');
+        }
+
+        $next = ((int)$cur) + 1;
+
+        $up = $this->db->prepare("
+            UPDATE {$this->tableSeries}
+               SET correlativo_actual=?, updated_at=NOW()
+             WHERE id_ies=? AND tipo_doc=? AND serie=?
+        ");
+        $up->execute([$next, $idIes, $tipoDoc, $serie]);
+
+        return $next;
+    }
+
+    private function isHttpUrl(string $v): bool
+    {
+        $v = trim($v);
+        if ($v === '') return false;
+        return (bool)preg_match('~^https?://~i', $v);
+    }
+
+    private function docBaseName(string $rucEmisor, string $tipoDoc, string $serie, int $correlativo): string
+    {
+        $corrPad = str_pad((string)$correlativo, 8, '0', STR_PAD_LEFT);
+        // Estándar SUNAT: RUC-TIPO-SERIE-CORRELATIVO
+        return "{$rucEmisor}-{$tipoDoc}-{$serie}-{$corrPad}";
+    }
+
+    /* ===================== Endpoints ===================== */
+
     /**
      * POST /api/cpe/emitir
-     * - Protegido por X-Api-Key
-     * - Soporta idempotencia con X-Idempotency-Key
-     * - Reserva correlativo por serie (FOR UPDATE)
-     * - Genera XML "stub" y lo guarda en: public/cpe/{id_ies}/xml/
-     * - Guarda xml_path relativo: cpe/{id_ies}/xml/archivo.xml
+     * Enfoque nuevo:
+     * - Admin (API): genera/valida, asigna correlativo, registra en BD
+     * - Devuelve xml_b64 (y luego cdr_b64/pdf_b64)
+     * - Cliente guarda los archivos localmente
      */
     public function emitir()
     {
         $this->requireApiKey();
         $this->maybeReplayIdem();
 
-        $in = json_decode(file_get_contents('php://input'), true) ?? ($_POST ?: []);
-        $tipo  = trim((string)($in['tipo_doc'] ?? ''));
-        $serie = trim((string)($in['serie'] ?? ''));
-        $items = $in['items'] ?? [];
+        $in = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($in)) $in = [];
 
-        if (!in_array($tipo, ['01', '03', '07', '08'], true)) {
-            $this->error('tipo_doc inválido (01,03,07,08)', 422, 'VALIDATION');
+        $tipoDoc = trim((string)($in['tipo_doc'] ?? ''));
+        $serie   = trim((string)($in['serie'] ?? ''));
+        $moneda  = trim((string)($in['moneda'] ?? 'PEN'));
+
+        if ($tipoDoc === '' || $serie === '') {
+            $this->error('Faltan campos: tipo_doc, serie', 422, 'VALIDATION');
         }
-        if ($serie === '') {
-            $this->error('Falta serie (ej: F001/B001)', 422, 'VALIDATION');
-        }
-        if (!is_array($items) || count($items) < 1) {
+
+        $clienteTipo = trim((string)($in['cliente']['doc_tipo'] ?? ''));
+        $clienteNro  = trim((string)($in['cliente']['doc_nro']  ?? ''));
+        $clienteNom  = trim((string)($in['cliente']['nombre']   ?? ''));
+
+        $opGrav = (float)($in['totales']['op_gravada'] ?? 0);
+        $opInaf = (float)($in['totales']['op_inafecta'] ?? 0);
+        $opExo  = (float)($in['totales']['op_exonerada'] ?? 0);
+        $igv    = (float)($in['totales']['igv'] ?? 0);
+        $total  = (float)($in['totales']['total'] ?? 0);
+
+        $items = $in['items'] ?? [];
+        if (!is_array($items) || count($items) === 0) {
             $this->error('Faltan items', 422, 'VALIDATION');
         }
 
-        $this->db->beginTransaction();
+        $idIes = (int)$this->tenantId;
+        $ies   = $this->getIes($idIes);
+        $rucEmisor = trim((string)($ies['ruc'] ?? ''));
+        if ($rucEmisor === '') {
+            $this->error('IES sin RUC configurado', 422, 'IES_RUC_MISSING');
+        }
+
+        $uuid = $this->uuidV4();
+
         try {
-            // 1) Reservar correlativo (lock por serie)
+            $this->db->beginTransaction();
+
+            $correlativo = $this->nextCorrelativo($idIes, $tipoDoc, $serie);
+
+            // XML (por ahora stub). Luego lo reemplazamos por UBL real + firma.
+            $xmlContent = $this->buildXmlStub($tipoDoc, $serie, $correlativo, $moneda, $in, $rucEmisor);
+            $hash = hash('sha256', $xmlContent);
+
+            // Registrar documento (NO guardamos xml_path local en Admin)
             $st = $this->db->prepare("
-                SELECT id, correlativo_actual
-                  FROM cpe_series
-                 WHERE id_ies=? AND tipo_doc=? AND serie=? AND activo=1
-                 FOR UPDATE
-            ");
-            $st->execute([$this->tenantId, $tipo, $serie]);
-            $row = $st->fetch(\PDO::FETCH_ASSOC);
-
-            if (!$row) {
-                $this->db->prepare("
-                    INSERT INTO cpe_series (id_ies, tipo_doc, serie, correlativo_actual, activo, created_at, updated_at)
-                    VALUES (?,?,?,?,1,NOW(),NOW())
-                ")->execute([$this->tenantId, $tipo, $serie, 0]);
-
-                $seriesId = (int)$this->db->lastInsertId();
-                $corr = 1;
-                $this->db->prepare("UPDATE cpe_series SET correlativo_actual=? WHERE id=?")
-                    ->execute([$corr, $seriesId]);
-            } else {
-                $seriesId = (int)$row['id'];
-                $corr = ((int)$row['correlativo_actual']) + 1;
-                $this->db->prepare("UPDATE cpe_series SET correlativo_actual=? WHERE id=?")
-                    ->execute([$corr, $seriesId]);
-            }
-
-            // 2) Insert documento
-            $uuid = $this->uuidv4();
-            $cliente = $in['cliente'] ?? [];
-            $tot = $in['totales'] ?? [];
-
-            $opg   = (float)($tot['op_gravada'] ?? 0);
-            $ope   = (float)($tot['op_exonerada'] ?? 0);
-            $opi   = (float)($tot['op_inafecta'] ?? 0);
-            $igv   = (float)($tot['igv'] ?? 0);
-            $total = (float)($tot['total'] ?? 0);
-
-            $st = $this->db->prepare("
-                INSERT INTO cpe_documentos
-                (uuid,id_ies,tipo_doc,serie,correlativo,fecha_emision,cliente_doc_tipo,cliente_doc_nro,cliente_nombre,
-                 moneda,op_gravada,op_inafecta,op_exonerada,igv,total,estado,created_at,updated_at)
+                INSERT INTO {$this->tableDocs}
+                (uuid, id_ies, tipo_doc, serie, correlativo, fecha_emision,
+                 cliente_doc_tipo, cliente_doc_nro, cliente_nombre,
+                 moneda, op_gravada, op_inafecta, op_exonerada, igv, total,
+                 estado, xml_path, cdr_path, pdf_path, hash, created_at, updated_at)
                 VALUES
-                (?,?,?,?,?,NOW(),?,?,?,?,?,?,?,?,?,'REGISTRADO',NOW(),NOW())
+                (?,?,?,?,?, NOW(),
+                 ?,?,?, 
+                 ?,?,?,?,?,?,
+                 'XML_GENERADO', NULL, NULL, NULL, ?, NOW(), NOW())
             ");
             $st->execute([
-                $uuid,
-                $this->tenantId,
-                $tipo,
-                $serie,
-                $corr,
-                ($cliente['doc_tipo'] ?? null),
-                ($cliente['doc_nro'] ?? null),
-                ($cliente['nombre'] ?? null),
-                ($in['moneda'] ?? 'PEN'),
-                $opg,
-                $opi,
-                $ope,
-                $igv,
-                $total,
+                $uuid, $idIes, $tipoDoc, $serie, $correlativo,
+                $clienteTipo ?: null,
+                $clienteNro  ?: null,
+                $clienteNom  ?: null,
+                $moneda,
+                $opGrav, $opInaf, $opExo, $igv, $total,
+                $hash
             ]);
+
             $idCpe = (int)$this->db->lastInsertId();
 
-            // 3) Insert items
-            $n = 1;
+            // Items
             $stI = $this->db->prepare("
-                INSERT INTO cpe_items (id_cpe,item_n,codigo,descripcion,unidad,cantidad,valor_unit,precio_unit,igv,total,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,NOW())
+                INSERT INTO {$this->tableItems}
+                (id_cpe, item_n, codigo, descripcion, unidad, cantidad, valor_unit, precio_unit, igv, total, created_at)
+                VALUES
+                (?,?,?,?,?,?,?,?,?,?, NOW())
             ");
+
+            $n = 1;
             foreach ($items as $it) {
+                if (!is_array($it)) continue;
+
                 $desc = trim((string)($it['descripcion'] ?? ''));
-                if ($desc === '') $this->error('Item sin descripcion', 422, 'VALIDATION');
+                if ($desc === '') {
+                    $this->db->rollBack();
+                    $this->error("Item $n: falta descripcion", 422, 'VALIDATION');
+                }
 
                 $stI->execute([
                     $idCpe,
-                    $n++,
-                    ($it['codigo'] ?? null),
+                    $n,
+                    isset($it['codigo']) ? trim((string)$it['codigo']) : null,
                     $desc,
-                    ($it['unidad'] ?? 'NIU'),
+                    trim((string)($it['unidad'] ?? 'NIU')) ?: 'NIU',
                     (float)($it['cantidad'] ?? 1),
                     (float)($it['valor_unit'] ?? 0),
                     (float)($it['precio_unit'] ?? 0),
                     (float)($it['igv'] ?? 0),
                     (float)($it['total'] ?? 0),
                 ]);
+                $n++;
             }
-
-            // 4) Guardar XML en carpeta por tenant: public/cpe/{id_ies}/xml/
-            $publicRoot = realpath(__DIR__ . '/../../../public');
-            if ($publicRoot === false) {
-                $this->db->rollBack();
-                $this->error('No se ubicó /public', 500, 'PATH_ERROR');
-            }
-
-            $xmlDir = $publicRoot
-                . DIRECTORY_SEPARATOR . 'cpe'
-                . DIRECTORY_SEPARATOR . $this->tenantId
-                . DIRECTORY_SEPARATOR . 'xml';
-
-            $this->ensureDir($xmlDir);
-
-            $filename = $this->sanitizeFilename("{$tipo}-{$serie}-{$corr}.xml", 120);
-            $absPath  = $this->uniquePath($xmlDir, $filename);
-
-            // XML stub (luego lo reemplazamos por UBL real + firma)
-            $xml = "<CPE><tipo>{$tipo}</tipo><serie>{$serie}</serie><correlativo>{$corr}</correlativo><uuid>{$uuid}</uuid></CPE>";
-            file_put_contents($absPath, $xml);
-
-            $rel = 'cpe/' . $this->tenantId . '/xml/' . basename($absPath);
-
-            $this->db->prepare("UPDATE cpe_documentos SET xml_path=?, estado='XML_GENERADO' WHERE id=?")
-                ->execute([$rel, $idCpe]);
 
             $this->db->commit();
 
-            // Links seguros (descarga protegida por API key)
-            $base = (defined('BASE_URL') ? rtrim(BASE_URL, '/') : '');
+            $baseName = $this->docBaseName($rucEmisor, $tipoDoc, $serie, $correlativo);
+
             $payload = [
                 'ok' => true,
                 'uuid' => $uuid,
-                'tipo_doc' => $tipo,
+                'id_ies' => $idIes,
+                'tipo_doc' => $tipoDoc,
                 'serie' => $serie,
-                'correlativo' => $corr,
+                'correlativo' => $correlativo,
                 'estado' => 'XML_GENERADO',
+                'hash' => $hash,
+                'suggested_files' => [
+                    'xml' => $baseName . '.xml',
+                    'cdr' => 'R-' . $baseName . '.zip',
+                    'pdf' => $baseName . '.pdf',
+                ],
+                'files' => [
+                    'xml_b64' => base64_encode($xmlContent),
+                    // luego: 'cdr_b64' => ..., 'pdf_b64' => ...
+                ],
+                // En el nuevo enfoque, descargar funciona solo si el cliente registra URLs.
                 'links' => [
-                    'xml' => $base . "/api/cpe/descargar/{$uuid}/xml",
-                    'cdr' => $base . "/api/cpe/descargar/{$uuid}/cdr",
-                    'pdf' => $base . "/api/cpe/descargar/{$uuid}/pdf",
+                    'registrar_archivos' => (defined('BASE_URL') ? BASE_URL : '') . "/api/cpe/archivos/{$uuid}",
+                    'descargar_xml'      => (defined('BASE_URL') ? BASE_URL : '') . "/api/cpe/descargar/{$uuid}/xml",
+                    'descargar_cdr'      => (defined('BASE_URL') ? BASE_URL : '') . "/api/cpe/descargar/{$uuid}/cdr",
+                    'descargar_pdf'      => (defined('BASE_URL') ? BASE_URL : '') . "/api/cpe/descargar/{$uuid}/pdf",
                 ],
             ];
+
             return $this->respondIdem($payload, 201);
+
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
-            return $this->json(['ok' => false, 'error' => ['code' => 'EXCEPTION', 'message' => $e->getMessage()]], 500);
+            $this->error('EXCEPTION: ' . $e->getMessage(), 500, 'EXCEPTION');
         }
     }
 
     /**
-     * GET /api/cpe/estado/{uuid}
-     * - Protegido por X-Api-Key
-     * - Devuelve estado y links seguros de descarga
+     * POST /api/cpe/archivos/{uuid}
+     * El Cliente reporta dónde guardó los archivos (ideal: URLs públicas del cliente).
+     * body JSON:
+     * { "xml_url":"https://cliente.../cpe/...xml", "cdr_url":"...", "pdf_url":"..." }
      */
-    public function estado($uuid)
+    public function archivos($uuid = null)
     {
         $this->requireApiKey();
 
-        $uuid = trim((string)$uuid);
-        if ($uuid === '') $this->error('uuid inválido', 422, 'VALIDATION');
+        $uuid = (string)$uuid;
+        $this->validateUuid($uuid);
+
+        $doc = $this->getDocByUuid($uuid);
+        if (!$doc) {
+            $this->error('Documento no encontrado', 404, 'NOT_FOUND', ['uuid' => $uuid]);
+        }
+
+        $in = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($in)) $in = [];
+
+        $xml = trim((string)($in['xml_url'] ?? $in['xml_path'] ?? ''));
+        $cdr = trim((string)($in['cdr_url'] ?? $in['cdr_path'] ?? ''));
+        $pdf = trim((string)($in['pdf_url'] ?? $in['pdf_path'] ?? ''));
+
+        // Recomendación: registrar como URL pública del cliente
+        // (o un path del cliente si luego implementarás proxy interno).
+        if ($xml !== '' && !$this->isHttpUrl($xml)) {
+            $this->error('xml_url debe ser URL http(s)', 422, 'VALIDATION');
+        }
+        if ($cdr !== '' && !$this->isHttpUrl($cdr)) {
+            $this->error('cdr_url debe ser URL http(s)', 422, 'VALIDATION');
+        }
+        if ($pdf !== '' && !$this->isHttpUrl($pdf)) {
+            $this->error('pdf_url debe ser URL http(s)', 422, 'VALIDATION');
+        }
 
         $st = $this->db->prepare("
-            SELECT uuid, tipo_doc, serie, correlativo, fecha_emision,
-                   cliente_doc_tipo, cliente_doc_nro, cliente_nombre,
-                   moneda, op_gravada, op_inafecta, op_exonerada, igv, total,
-                   estado, sunat_code, sunat_message,
-                   xml_path, cdr_path, pdf_path,
-                   created_at, updated_at
-              FROM cpe_documentos
+            UPDATE {$this->tableDocs}
+               SET xml_path = COALESCE(NULLIF(?,''), xml_path),
+                   cdr_path = COALESCE(NULLIF(?,''), cdr_path),
+                   pdf_path = COALESCE(NULLIF(?,''), pdf_path),
+                   updated_at = NOW()
              WHERE uuid=? AND id_ies=?
              LIMIT 1
         ");
-        $st->execute([$uuid, $this->tenantId]);
-        $doc = $st->fetch(\PDO::FETCH_ASSOC);
-        if (!$doc) $this->error('No encontrado', 404, 'NOT_FOUND');
+        $st->execute([$xml, $cdr, $pdf, $uuid, (int)$this->tenantId]);
 
-        $base = (defined('BASE_URL') ? rtrim(BASE_URL, '/') : '');
-        $doc['links'] = [
-            'xml' => $doc['xml_path'] ? ($base . "/api/cpe/descargar/{$uuid}/xml") : null,
-            'cdr' => $doc['cdr_path'] ? ($base . "/api/cpe/descargar/{$uuid}/cdr") : null,
-            'pdf' => $doc['pdf_path'] ? ($base . "/api/cpe/descargar/{$uuid}/pdf") : null,
-        ];
-
-        return $this->json(['ok' => true, 'data' => $doc], 200);
+        return $this->json([
+            'ok' => true,
+            'uuid' => $uuid,
+            'stored' => [
+                'xml_path' => $xml ?: ($doc['xml_path'] ?? null),
+                'cdr_path' => $cdr ?: ($doc['cdr_path'] ?? null),
+                'pdf_path' => $pdf ?: ($doc['pdf_path'] ?? null),
+            ]
+        ], 200);
     }
 
     /**
      * GET /api/cpe/descargar/{uuid}/{tipo}
-     * - Protegido por X-Api-Key
-     * - Valida que el documento pertenezca al id_ies (tenant)
-     * - Lee el archivo real y lo entrega con readfile()
+     * Nuevo enfoque:
+     * - Admin NO tiene archivos locales.
+     * - Si xml_path/cdr_path/pdf_path está registrado como URL del cliente => redirect 302.
      */
     public function descargar($uuid = null, $tipo = null)
     {
-        // 1) Seguridad: API KEY + tenantId (id_ies)
         $this->requireApiKey();
 
-        $uuid = is_string($uuid) ? trim($uuid) : '';
-        $tipo = is_string($tipo) ? strtolower(trim($tipo)) : '';
+        $uuid = (string)$uuid;
+        $tipo = strtolower((string)$tipo);
+        $this->validateUuid($uuid);
 
-        // 2) Validaciones básicas anti path traversal
-        if ($uuid === '' || strlen($uuid) > 80 || !preg_match('/^[A-Za-z0-9\-_.]+$/', $uuid)) {
-            $this->error('UUID inválido', 422, 'VALIDATION');
-        }
-
-        $map = [
-            'xml' => ['ext' => 'xml', 'mime' => 'application/xml; charset=utf-8'],
-            'cdr' => ['ext' => 'zip', 'mime' => 'application/zip'],
-            'pdf' => ['ext' => 'pdf', 'mime' => 'application/pdf'],
+        $tipoMap = [
+            'xml' => 'xml_path',
+            'cdr' => 'cdr_path',
+            'pdf' => 'pdf_path',
         ];
-
-        if (!isset($map[$tipo])) {
+        if (!isset($tipoMap[$tipo])) {
             $this->error('Tipo inválido. Use: xml|cdr|pdf', 422, 'VALIDATION');
         }
 
-        $ext  = $map[$tipo]['ext'];
-        $mime = $map[$tipo]['mime'];
-
-        // 3) Resolver /public
-        $publicRoot = realpath(__DIR__ . '/../../../public');
-        if ($publicRoot === false) {
-            $this->error('No se ubicó /public', 500, 'PATH_ERROR');
-        }
-
-        // 4) Rutas por IES (separado por cliente)
-        $tenant = (int)$this->tenantId;
-        $baseDir = $publicRoot . DIRECTORY_SEPARATOR . 'cpe'
-            . DIRECTORY_SEPARATOR . $tenant
-            . DIRECTORY_SEPARATOR . $tipo;
-
-        // Path principal: /public/cpe/{id_ies}/{tipo}/{uuid}.{ext}
-        $path1 = $baseDir . DIRECTORY_SEPARATOR . $uuid . '.' . $ext;
-
-        // Fallback opcional si usas: /public/cpe/{id_ies}/{uuid}/{tipo}.{ext}
-        $path2 = $publicRoot . DIRECTORY_SEPARATOR . 'cpe'
-            . DIRECTORY_SEPARATOR . $tenant
-            . DIRECTORY_SEPARATOR . $uuid
-            . DIRECTORY_SEPARATOR . $tipo . '.' . $ext;
-
-        $filePath = null;
-        if (is_file($path1)) $filePath = $path1;
-        elseif (is_file($path2)) $filePath = $path2;
-
-        if ($filePath === null) {
-            $this->error('Archivo no encontrado', 404, 'NOT_FOUND', [
+        $doc = $this->getDocByUuid($uuid);
+        if (!$doc) {
+            $this->error('Documento no encontrado', 404, 'NOT_FOUND', [
                 'uuid' => $uuid,
-                'tipo' => $tipo,
-                'id_ies' => $tenant
+                'id_ies' => (int)$this->tenantId
             ]);
         }
 
-        // 5) Headers de descarga (seguro)
-        if (ob_get_level()) @ob_end_clean();
+        $col = $tipoMap[$tipo];
+        $url = trim((string)($doc[$col] ?? ''));
 
-        header('X-Content-Type-Options: nosniff');
-        header('Content-Type: ' . $mime);
+        if ($url === '') {
+            $this->error('Archivo no disponible todavía (no registrado por el cliente)', 404, 'NOT_READY', [
+                'uuid' => $uuid,
+                'tipo' => $tipo,
+                'estado' => $doc['estado'] ?? null
+            ]);
+        }
 
-        $downloadName = $uuid . '.' . $ext;
-        header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+        if (!$this->isHttpUrl($url)) {
+            $this->error('Archivo registrado no es URL http(s). Ajusta /api/cpe/archivos/{uuid}', 422, 'BAD_FILE_URL', [
+                'value' => $url
+            ]);
+        }
 
-        $size = @filesize($filePath);
-        if ($size !== false) header('Content-Length: ' . $size);
-
-        // Opcional: cache-control
-        header('Cache-Control: private, max-age=0, no-cache, no-store, must-revalidate');
+        // Seguridad extra: evita cache
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
         header('Expires: 0');
 
-        // 6) Entregar
-        @readfile($filePath);
+        // Redirect controlado por API (validó API key + id_ies)
+        header('Location: ' . $url, true, 302);
         exit;
-    }
-
-    private function uuidv4(): string
-    {
-        $data = random_bytes(16);
-        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
-        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
-        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 }

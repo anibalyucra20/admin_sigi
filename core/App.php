@@ -14,6 +14,10 @@ class App
         date_default_timezone_set('America/Lima');
 
         $segments = $this->parseUrl();   // ej: ['sigi','docentes','edit',5]
+        if (!empty($segments[0]) && strtolower($segments[0]) === 'api') {
+            if (!defined('IS_API')) define('IS_API', true);
+        }
+
         if (!empty($segments[0]) && strtolower($segments[0]) === 'logout') {
             $this->module     = 'Auth';
             $this->controller = 'LoginController';
