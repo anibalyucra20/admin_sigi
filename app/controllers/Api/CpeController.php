@@ -802,16 +802,11 @@ XML;
     //=========================== Firma XML ===========================
     private function signXmlWithPfx(string $xml, string $pfxBinary, string $pfxPass): string
     {
-        $pfxBinary = $this->normalizePfxBinary((string)$pfxBinary);
-
-        if ($pfxBinary === '' || strlen($pfxBinary) < 500) {
-            throw new \RuntimeException('PFX vacío o demasiado pequeño (posible truncado/base64 mal).');
-        }
-
+        
         error_log("PFX len=" . strlen((string)$pfxBinary));
         error_log("PFX head=" . substr((string)$pfxBinary, 0, 30));
 
-
+        
         if (!openssl_pkcs12_read($pfxBinary, $certs, $pfxPass)) {
             throw new \RuntimeException('No se pudo leer el PFX (password incorrecto o archivo inválido).');
         }
