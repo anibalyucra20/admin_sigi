@@ -1411,10 +1411,21 @@ XML;
 
     private function signUblIntoExtension(string $ublXml, string $pfxBinary, string $pfxPass): string
     {
-        
+        $pfxBinary = $this->normalizePfxBinary((string)$pfxBinary);
+
+        if ($pfxBinary === '' || strlen($pfxBinary) < 500) {
+            throw new \RuntimeException('PFX vacío o demasiado pequeño (posible truncado/base64 mal).');
+        }
 
         error_log("PFX len=" . strlen((string)$pfxBinary));
         error_log("PFX head=" . substr((string)$pfxBinary, 0, 30));
+
+        $pfxPass = (string)$pfxPass;
+        error_log("PFXPASS len=" . strlen($pfxPass));
+        error_log("PFXPASS hex_last16=" . bin2hex(substr($pfxPass, -16)));
+        $pfxPass = trim($pfxPass); // prueba obligatoria
+        error_log("PFXPASS len(trim)=" . strlen($pfxPass));
+
 
         if (!openssl_pkcs12_read($pfxBinary, $certs, $pfxPass)) {
             throw new \RuntimeException('No se pudo leer el PFX (password incorrecto o archivo inválido).');
