@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+require_once __DIR__ . '/../models/Api/ConsultaModel.php';
+
 use App\Models\Api\ConsultaModel;
 
 class ConsultaService
