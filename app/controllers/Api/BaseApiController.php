@@ -29,7 +29,8 @@ class BaseApiController extends Controller
     protected function error(string $message, int $status = 400, string $code = 'ERROR', array $details = [])
     {
         $payload = ['ok' => false, 'error' => ['code' => $code, 'message' => $message]];
-        if ($details) $payload['error']['details'] = $details;
+        if ($details)
+            $payload['error']['details'] = $details;
         $this->json($payload, $status);
     }
 
@@ -38,23 +39,25 @@ class BaseApiController extends Controller
         $fallback = [
             'library' => [
                 'covers_base_url' => (defined('BASE_URL') ? BASE_URL : '') . '/covers',
-                'files_base_url'  => (defined('BASE_URL') ? BASE_URL : '') . '/books',
+                'files_base_url' => (defined('BASE_URL') ? BASE_URL : '') . '/books',
             ]
         ];
         $path = __DIR__ . '/../../../config/app.php';
-        $cfg  = file_exists($path) ? require $path : $fallback;
+        $cfg = file_exists($path) ? require $path : $fallback;
         $cfg['library']['covers_base_url'] = rtrim($cfg['library']['covers_base_url'] ?? $fallback['library']['covers_base_url'], '/');
-        $cfg['library']['files_base_url']  = rtrim($cfg['library']['files_base_url']  ?? $fallback['library']['files_base_url'],  '/');
+        $cfg['library']['files_base_url'] = rtrim($cfg['library']['files_base_url'] ?? $fallback['library']['files_base_url'], '/');
         return $cfg;
     }
 
     protected function getHeader(string $name): ?string
     {
         $key = 'HTTP_' . str_replace('-', '_', strtoupper($name));
-        if (!empty($_SERVER[$key])) return $_SERVER[$key];
+        if (!empty($_SERVER[$key]))
+            return $_SERVER[$key];
         if (function_exists('getallheaders')) {
             foreach (getallheaders() as $k => $v) {
-                if (strcasecmp($k, $name) === 0) return $v;
+                if (strcasecmp($k, $name) === 0)
+                    return $v;
             }
         }
         return null;
@@ -66,9 +69,9 @@ class BaseApiController extends Controller
      * - Verifica hash contra raw completo y, en compat, contra solo el secreto.
      * - Exige IES activa y suscripción vigente (trial/activa dentro de fechas).
      */
-    protected function requireApiKey(): bool
+    protected function requireApiKey($end_personalizado = ""): bool
     {
-        $raw = trim((string)($this->getHeader('X-Api-Key') ?? ''));
+        $raw = trim((string) ($this->getHeader('X-Api-Key') ?? ''));
         if ($raw === '') {
             $this->error('Falta X-Api-Key', 401, 'MISSING_API_KEY');
         }
@@ -83,7 +86,7 @@ class BaseApiController extends Controller
         // 1) Resolver IES (por id numérico o por dominio/llave)
         if (ctype_digit($tenant)) {
             $st = $this->db->prepare("SELECT id, estado FROM ies WHERE id=? LIMIT 1");
-            $st->execute([(int)$tenant]);
+            $st->execute([(int) $tenant]);
         } else {
             $st = $this->db->prepare("SELECT id, estado FROM ies WHERE dominio=? OR llave=? LIMIT 1");
             $st->execute([$tenant, $tenant]);
@@ -109,10 +112,11 @@ class BaseApiController extends Controller
         $matchedKeyId = null;
         foreach ($keys as $k) {
             $hash = $k['key_hash'] ?? '';
-            if ($hash === '') continue;
+            if ($hash === '')
+                continue;
             if (password_verify($raw, $hash) || password_verify($secret, $hash)) {
                 $ok = true;
-                $matchedKeyId = (int)$k['id'];
+                $matchedKeyId = (int) $k['id'];
                 break;
             }
         }
@@ -135,17 +139,19 @@ class BaseApiController extends Controller
         }
 
         // 5) OK → set context y actualizar último uso; sumar uso
-        $this->tenantId = (int)$ies['id'];
+        $this->tenantId = (int) $ies['id'];
         $this->apiKeyId = $matchedKeyId;
         $this->db->prepare("UPDATE api_keys SET ultimo_uso=NOW() WHERE id=?")->execute([$matchedKeyId]);
-        $this->incUsage($this->currentEndpoint());
+
+        $this->incUsage($this->currentEndpoint($end_personalizado));
 
         return true;
     }
 
     protected function incUsage(string $endpoint, int $bytes = 0): void
     {
-        if (!$this->tenantId) return;
+        if (!$this->tenantId)
+            return;
         $st = $this->db->prepare("
             INSERT INTO usage_counters (id_ies, periodo_aaaamm, endpoint, requests, bytes, created_at, updated_at)
             VALUES (?, DATE_FORMAT(CURDATE(), '%Y%m'), ?, 1, ?, NOW(), NOW())
@@ -156,7 +162,8 @@ class BaseApiController extends Controller
 
     protected function ensureDir(string $dir): void
     {
-        if (!is_dir($dir)) @mkdir($dir, 0775, true);
+        if (!is_dir($dir))
+            @mkdir($dir, 0775, true);
     }
 
     protected function sanitizeFilename(string $name, int $max = 100): string
@@ -168,7 +175,8 @@ class BaseApiController extends Controller
         $ext = pathinfo($ascii, PATHINFO_EXTENSION);
         $base = $ext ? substr($ascii, 0, - (strlen($ext) + 1)) : $ascii;
         $room = $ext ? $max - (strlen($ext) + 1) : $max;
-        if ($room < 1) $room = 1;
+        if ($room < 1)
+            $room = 1;
         $base = substr($base, 0, $room);
         return $ext ? ($base . '.' . $ext) : $base;
     }
@@ -176,7 +184,8 @@ class BaseApiController extends Controller
     protected function uniquePath(string $dir, string $filename): string
     {
         $path = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $filename;
-        if (!file_exists($path)) return $path;
+        if (!file_exists($path))
+            return $path;
         $ext = pathinfo($filename, PATHINFO_EXTENSION);
         $base = $ext ? substr($filename, 0, - (strlen($ext) + 1)) : $filename;
         $i = 2;
@@ -196,15 +205,19 @@ class BaseApiController extends Controller
         return $v !== '' ? substr($v, 0, 80) : null;
     }
 
-    protected function currentEndpoint(): string
+    protected function currentEndpoint($end_personalizado = ""): string
     {
+        if ($end_personalizado != "") {
+            return $end_personalizado;
+        }
         return substr(parse_url($_SERVER['REQUEST_URI'] ?? '/api', PHP_URL_PATH) ?: '/api', 0, 150);
     }
 
     protected function maybeReplayIdem(): void
     {
         $key = $this->idemKey();
-        if (!$key || !$this->tenantId) return;
+        if (!$key || !$this->tenantId)
+            return;
 
         $st = $this->db->prepare("
             SELECT status, response_json 
@@ -215,7 +228,7 @@ class BaseApiController extends Controller
         $st->execute([$this->tenantId, $this->currentEndpoint(), $_SERVER['REQUEST_METHOD'] ?? 'POST', $key]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if ($row) {
-            http_response_code((int)$row['status']);
+            http_response_code((int) $row['status']);
             header('Content-Type: application/json; charset=utf-8');
             echo $row['response_json'];
             exit;
@@ -225,7 +238,8 @@ class BaseApiController extends Controller
     protected function storeIdem(array $payload, int $status): void
     {
         $key = $this->idemKey();
-        if (!$key || !$this->tenantId) return;
+        if (!$key || !$this->tenantId)
+            return;
 
         $st = $this->db->prepare("
             INSERT INTO api_idempotency (id_ies, endpoint, method, idem_key, status, response_json, created_at)

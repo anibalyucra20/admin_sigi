@@ -1,0 +1,176 @@
+<?php
+
+namespace App\Models\Api;
+
+use Core\Model;
+use PDO;
+
+class ConsultaModel extends Model
+{
+    /**
+     * 1. GESTIÓN DE TOKENS (Round Robin)
+     * Obtiene el token que no se ha usado por más tiempo de nuestra "bolsa" de tokens.
+     */
+    public function obtenerSiguienteToken()
+    {
+        // Seleccionamos el activo con fecha más antigua (o nula) para rotarlos equitativamente
+        $sql = "SELECT id, token, url 
+                FROM config_api_tokens 
+                WHERE estado = 1 
+                ORDER BY ultimo_uso_at ASC 
+                LIMIT 1";
+
+        $stmt = self::getDB()->prepare($sql);
+        $stmt->execute();
+        $res = $stmt->fetch();
+
+        return $res; // Retorna array ['id' => X, 'token' => '...', 'url' => '...'] o false
+    }
+
+    /**
+     * Actualiza la fecha de uso del token para mandarlo al "final de la cola".
+     */
+    public function actualizarUsoToken($idToken)
+    {
+        $sql = "UPDATE config_api_tokens 
+                SET usos_totales = usos_totales + 1, 
+                    ultimo_uso_at = NOW() 
+                WHERE id = :id";
+
+        $stmt = self::getDB()->prepare($sql);
+        $stmt->execute([':id' => $idToken]);
+    }
+
+    /**
+     * 2. VERIFICACIÓN DE CUOTA DE CLIENTE (IES)
+     * Revisa si la institución tiene un plan activo y saldo disponible.
+     */
+    public function verificarCuotaCliente($id_ies, $endpoint)
+    {
+        // Si es Admin Global (null), permitimos todo (opcional, depende de tu lógica)
+        if (empty($id_ies))
+            return false;
+
+        $db = self::getDB();
+
+        // PASO A: Obtener el límite del plan activo
+        // Buscamos en 'subscriptions' unida con 'planes'
+        // Validamos que el estado sea 'activa' y que la fecha actual esté dentro del rango
+        $sqlPlan = "SELECT p.limite_reniec 
+                    FROM subscriptions s
+                    INNER JOIN planes p ON s.id_plan = p.id
+                    WHERE s.id_ies = :id_ies 
+                      AND s.estado = 'activa' 
+                      AND CURDATE() BETWEEN s.inicia AND s.vence
+                    LIMIT 1";
+
+        $stmt = $db->prepare($sqlPlan);
+        $stmt->execute([':id_ies' => $id_ies]);
+        $plan = $stmt->fetch();
+
+        // Si no hay plan activo o venció, bloqueamos acceso
+        if (!$plan) {
+            return false;
+        }
+
+        $limitePermitido = intval($plan['limite_reniec']);
+
+        // PASO B: Calcular consumo actual del mes
+        $periodo = date('Ym'); // Formato de tu tabla usage_counters (ej: 202501)
+
+        $sqlUso = "SELECT requests FROM usage_counters 
+                   WHERE id_ies = :id_ies 
+                     AND periodo_aaaamm = :periodo 
+                     AND endpoint = '$endpoint'
+                   LIMIT 1";
+
+        $stmt = $db->prepare($sqlUso);
+        $stmt->execute([':id_ies' => $id_ies, ':periodo' => $periodo]);
+        $uso = $stmt->fetch();
+
+        $consumoActual = $uso ? intval($uso['requests']) : 0;
+
+        // PASO C: Comparar
+        // Retorna TRUE si tiene saldo, FALSE si excedió
+        return $consumoActual < $limitePermitido;
+    }
+
+    /**
+     * 3. REGISTRO DE CONSUMO
+     * Incrementa el contador para la facturación a fin de mes.
+     */
+    public function registrarConsumoCliente($id_ies)
+    {
+        $periodo = date('Ym');
+        $endpoint = 'consulta_externa'; // Identificador fijo para este servicio
+
+        // Usamos ON DUPLICATE KEY UPDATE para insertar o sumar en una sola consulta atómica
+        $sql = "INSERT INTO usage_counters (id_ies, periodo_aaaamm, endpoint, requests, created_at)
+                VALUES (:id_ies, :periodo, :endpoint, 1, NOW())
+                ON DUPLICATE KEY UPDATE requests = requests + 1, updated_at = NOW()";
+
+        $stmt = self::getDB()->prepare($sql);
+        $stmt->execute([
+            ':id_ies' => $id_ies,
+            ':periodo' => $periodo,
+            ':endpoint' => $endpoint
+        ]);
+    }
+
+
+    /**
+     * Búsqueda paginada en ESCALE
+     */
+    public function buscarColegiosLocal($termino, $limit, $offset)
+    {
+        $db = self::getDB();
+        $term = "%{$termino}%";
+
+        // Campos solicitados para la búsqueda
+        $where = "WHERE CodigoModular LIKE :t1 
+                     OR Nombre LIKE :t2 
+                     OR Direccion LIKE :t3 
+                     OR Departamento LIKE :t4 
+                     OR Provincia LIKE :t5 
+                     OR Distrito LIKE :t6";
+
+        // 1. Obtener Total de Registros (para paginación)
+        $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
+        $stmtCount = $db->prepare($sqlCount);
+        // Bind de parámetros (repetimos la variable para cada ? o placeholder)
+        $stmtCount->execute([
+            ':t1' => $term,
+            ':t2' => $term,
+            ':t3' => $term,
+            ':t4' => $term,
+            ':t5' => $term,
+            ':t6' => $term
+        ]);
+        $total = $stmtCount->fetchColumn();
+
+        // 2. Obtener Data Paginada
+        $sqlData = "SELECT id, CodigoModular, CodigoLocal, Nombre, 
+                           Modalidad, Gestion, Direccion, 
+                           Departamento, Provincia, Distrito 
+                    FROM escale_colegios 
+                    $where 
+                    ORDER BY Nombre ASC 
+                    LIMIT $limit OFFSET $offset";
+
+        $stmt = $db->prepare($sqlData);
+        $stmt->execute([
+            ':t1' => $term,
+            ':t2' => $term,
+            ':t3' => $term,
+            ':t4' => $term,
+            ':t5' => $term,
+            ':t6' => $term
+        ]);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'total' => (int)$total,
+            'items' => $items
+        ];
+    }
+}
