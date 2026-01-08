@@ -11,6 +11,7 @@ class ConsultaController extends BaseApiController
     private $endpointColegios = "/api/consulta/colegios/";
 
     public function __construct()
+
     {
         // 1. Inicializamos BaseApiController (Carga DB, Headers, etc.)
         parent::__construct();
