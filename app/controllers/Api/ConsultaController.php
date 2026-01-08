@@ -5,6 +5,8 @@ namespace App\Controllers\Api;
 require_once __DIR__ . '/BaseApiController.php';
 require_once __DIR__ . '/../../services/ConsultaService.php';
 
+use App\Services\ConsultaService;
+
 class ConsultaController extends BaseApiController
 {
     private $service;
