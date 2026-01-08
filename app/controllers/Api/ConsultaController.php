@@ -2,9 +2,8 @@
 
 namespace App\Controllers\Api;
 
-use App\Services\ConsultaService;
-
 require_once __DIR__ . '/BaseApiController.php';
+require_once __DIR__ . '/../../services/ConsultaService.php';
 
 class ConsultaController extends BaseApiController
 {
