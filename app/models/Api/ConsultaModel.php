@@ -149,7 +149,7 @@ class ConsultaModel extends Model
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
-        $sqlData = "SELECT id, CodigoModular, CodigoLocal, Nombre, 
+        $sqlData = "SELECT CodigoModular, CodigoLocal, Nombre, 
                            Modalidad, Gestion, Direccion, 
                            Departamento, Provincia, Distrito 
                     FROM escale_colegios 
