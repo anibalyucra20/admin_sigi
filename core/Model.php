@@ -74,7 +74,7 @@ class Model
             ':id_usuario'    => $id_usuario,
             ':accion'        => $accion,
             ':descripcion'   => $descripcion,
-            ':tabla_afectada'=> $tabla,
+            ':tabla_afectada' => $tabla,
             ':id_registro'   => $id_registro,
             ':ip_usuario'    => $_SERVER['REMOTE_ADDR'] ?? null,
         ]);

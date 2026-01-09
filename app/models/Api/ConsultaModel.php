@@ -174,7 +174,7 @@ class ConsultaModel extends Model
         ];
     }
 
-    public function departamentosLocal()
+    public function departamentos()
     {
         $db = self::getDB();
 
