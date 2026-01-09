@@ -122,10 +122,13 @@ class ConsultaController extends BaseApiController
             ]);
         }
     }
-    public function provincias($departamento)
+    public function provincias()
     {
         // 1. Seguridad
         $this->requireApiKey($this->endpointDepartamentos);
+
+        $departamento = $_GET['departamento'] ?? '';
+
         // 1. Ejecutar Servicio
         $resultado = $this->service->provincias($departamento);
         // 2. Respuesta
@@ -139,10 +142,14 @@ class ConsultaController extends BaseApiController
             ]);
         }
     }
-    public function distritos($departamento, $provincia)
+    public function distritos()
     {
         // 1. Seguridad
         $this->requireApiKey($this->endpointDepartamentos);
+
+        $departamento = $_GET['departamento'] ?? '';
+        $provincia = $_GET['provincia'] ?? '';
+
         // 1. Ejecutar Servicio
         $resultado = $this->service->distritos($departamento, $provincia);
         // 2. Respuesta
