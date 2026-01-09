@@ -124,9 +124,9 @@ class ConsultaService
     public function buscarColegios($data, $id_ies, $page = 1, $limit = 10, $endpoint = '/api/consulta/colegios/')
     {
         // 1. Validaciones
-        if (strlen($data) < 3) {
+        /* if (strlen($data) < 3) {
             return ['error' => 'Ingrese al menos 3 caracteres para buscar.', 'code' => 400];
-        }
+        }*/
 
         // 2. Control de Cuotas (Opcional: ¿Quieres cobrar por buscar colegios?)
         // Si la data es local, quizás no quieras cobrar, o quizás sí. 
