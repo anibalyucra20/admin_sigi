@@ -12,6 +12,7 @@ class ConsultaController extends BaseApiController
     private $service;
     private $endpointDniRuc = "/api/consulta/ruc_dni/";
     private $endpointColegios = "/api/consulta/colegios/";
+    private $endpointDepartamentos = "/api/consulta/departamentos/";
 
     public function __construct()
 
@@ -101,6 +102,57 @@ class ConsultaController extends BaseApiController
                 'ok' => true,
                 'data' => $resultado['data'],
                 'pagination' => $resultado['meta']
+            ]);
+        }
+    }
+    public function departamentos()
+    {
+        // 1. Seguridad
+        $this->requireApiKey($this->endpointDepartamentos);
+        // 1. Ejecutar Servicio
+        $resultado = $this->service->departamentos();
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            $this->error($resultado['error'], $resultado['code'], 'SEARCH_ERROR');
+        } else {
+            // Estructura limpia con paginación
+            $this->json([
+                'ok' => true,
+                'data' => $resultado['data']
+            ]);
+        }
+    }
+    public function provincias($departamento)
+    {
+        // 1. Seguridad
+        $this->requireApiKey($this->endpointDepartamentos);
+        // 1. Ejecutar Servicio
+        $resultado = $this->service->provincias($departamento);
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            $this->error($resultado['error'], $resultado['code'], 'SEARCH_ERROR');
+        } else {
+            // Estructura limpia con paginación
+            $this->json([
+                'ok' => true,
+                'data' => $resultado['data']
+            ]);
+        }
+    }
+    public function distritos($departamento, $provincia)
+    {
+        // 1. Seguridad
+        $this->requireApiKey($this->endpointDepartamentos);
+        // 1. Ejecutar Servicio
+        $resultado = $this->service->distritos($departamento, $provincia);
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            $this->error($resultado['error'], $resultado['code'], 'SEARCH_ERROR');
+        } else {
+            // Estructura limpia con paginación
+            $this->json([
+                'ok' => true,
+                'data' => $resultado['data']
             ]);
         }
     }

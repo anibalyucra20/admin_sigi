@@ -160,4 +160,37 @@ class ConsultaService
             'meta'    => $meta
         ];
     }
+    public function departamentos()
+    {
+        // 1. Ejecutar Servicio
+        $resultado = $this->model->departamentos();
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            return ['error' => $resultado['error'], 'code' => $resultado['code']];
+        } else {
+            return ['success' => true, 'data' => $resultado];
+        }
+    }
+    public function provincias($departamento)
+    {
+        // 1. Ejecutar Servicio
+        $resultado = $this->model->provincias($departamento);
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            return ['error' => $resultado['error'], 'code' => $resultado['code']];
+        } else {
+            return ['success' => true, 'data' => $resultado];
+        }
+    }
+    public function distritos($departamento, $provincia)
+    {
+        // 1. Ejecutar Servicio
+        $resultado = $this->model->distritos($departamento, $provincia);
+        // 2. Respuesta
+        if (isset($resultado['error'])) {
+            return ['error' => $resultado['error'], 'code' => $resultado['code']];
+        } else {
+            return ['success' => true, 'data' => $resultado];
+        }
+    }
 }

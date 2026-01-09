@@ -173,4 +173,73 @@ class ConsultaModel extends Model
             'items' => $items
         ];
     }
+
+    public function departamentosLocal()
+    {
+        $db = self::getDB();
+
+        // 1. Obtener Total de Registros (para paginación)
+        $sqlCount = "SELECT COUNT(DISTINCT Departamento) as total FROM escale_colegios";
+        $stmtCount = $db->prepare($sqlCount);
+        $stmtCount->execute();
+        $total = $stmtCount->fetchColumn();
+
+        // 2. Obtener Data Paginada
+        $sqlData = "SELECT DISTINCT Departamento FROM escale_colegios ORDER BY Departamento ASC";
+        $stmt = $db->prepare($sqlData);
+        $stmt->execute();
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'total' => (int)$total,
+            'items' => $items
+        ];
+    }
+    public function provincias($departamento)
+    {
+        $db = self::getDB();
+
+        // 1. Obtener Total de Registros (para paginación)
+        $sqlCount = "SELECT COUNT(DISTINCT Provincia) as total FROM escale_colegios WHERE Departamento = :departamento";
+        $stmtCount = $db->prepare($sqlCount);
+        $stmtCount->execute([':departamento' => $departamento]);
+        $total = $stmtCount->fetchColumn();
+
+        // 2. Obtener Data Paginada
+        $sqlData = "SELECT DISTINCT Provincia FROM escale_colegios WHERE Departamento = :departamento ORDER BY Provincia ASC";
+        $stmt = $db->prepare($sqlData);
+        $stmt->execute([':departamento' => $departamento]);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'total' => (int)$total,
+            'items' => $items
+        ];
+    }
+    public function distritos($departamento, $provincia)
+    {
+        $db = self::getDB();
+
+        // 1. Obtener Total de Registros (para paginación)
+        $sqlCount = "SELECT COUNT(DISTINCT Distrito) as total FROM escale_colegios WHERE Departamento = :departamento AND Provincia = :provincia";
+        $stmtCount = $db->prepare($sqlCount);
+        $stmtCount->execute([
+            ':departamento' => $departamento,
+            ':provincia' => $provincia
+        ]);
+        $total = $stmtCount->fetchColumn();
+
+        // 2. Obtener Data Paginada
+        $sqlData = "SELECT DISTINCT Distrito FROM escale_colegios WHERE Departamento = :departamento AND Provincia = :provincia ORDER BY Distrito ASC";
+        $stmt = $db->prepare($sqlData);
+        $stmt->execute([
+            ':departamento' => $departamento,
+            ':provincia' => $provincia
+        ]);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return [
+            'total' => (int)$total,
+            'items' => $items
+        ];
+    }
 }
