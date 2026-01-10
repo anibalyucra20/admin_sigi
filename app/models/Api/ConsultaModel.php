@@ -128,11 +128,11 @@ class ConsultaModel extends Model
 
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
-                     OR Nombre LIKE :t2 
-                     OR Direccion LIKE :t3 
-                     OR Departamento LIKE :t4 
-                     OR Provincia LIKE :t5 
-                     OR Distrito LIKE :t6";
+                     OR CEN_EDU LIKE :t2 
+                     OR DIR_CEN LIKE :t3 
+                     OR D_DPTO LIKE :t4 
+                     OR D_PROV LIKE :t5 
+                     OR D_DIST LIKE :t6";
 
         // 1. Obtener Total de Registros (para paginación)
         $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
@@ -149,12 +149,10 @@ class ConsultaModel extends Model
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
-        $sqlData = "SELECT CodigoModular, CodigoLocal, Nombre, 
-                           Modalidad, Gestion, Direccion, 
-                           Departamento, Provincia, Distrito 
+        $sqlData = "SELECT * 
                     FROM escale_colegios 
                     $where 
-                    ORDER BY Nombre ASC 
+                    ORDER BY CEN_EDU ASC 
                     LIMIT $limit OFFSET $offset";
 
         $stmt = $db->prepare($sqlData);
@@ -179,13 +177,13 @@ class ConsultaModel extends Model
         $db = self::getDB();
 
         // 1. Obtener Total de Registros (para paginación)
-        $sqlCount = "SELECT COUNT(DISTINCT Departamento) as total FROM escale_colegios";
+        $sqlCount = "SELECT COUNT(DISTINCT D_DPTO) as total FROM escale_colegios";
         $stmtCount = $db->prepare($sqlCount);
         $stmtCount->execute();
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
-        $sqlData = "SELECT DISTINCT Departamento FROM escale_colegios ORDER BY Departamento ASC";
+        $sqlData = "SELECT DISTINCT D_DPTO FROM escale_colegios ORDER BY D_DPTO ASC";
         $stmt = $db->prepare($sqlData);
         $stmt->execute();
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -200,13 +198,13 @@ class ConsultaModel extends Model
         $db = self::getDB();
 
         // 1. Obtener Total de Registros (para paginación)
-        $sqlCount = "SELECT COUNT(DISTINCT Provincia) as total FROM escale_colegios WHERE Departamento = :departamento";
+        $sqlCount = "SELECT COUNT(DISTINCT D_PROV) as total FROM escale_colegios WHERE D_DPTO = :departamento";
         $stmtCount = $db->prepare($sqlCount);
         $stmtCount->execute([':departamento' => $departamento]);
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
-        $sqlData = "SELECT DISTINCT Provincia FROM escale_colegios WHERE Departamento = :departamento ORDER BY Provincia ASC";
+        $sqlData = "SELECT DISTINCT D_PROV FROM escale_colegios WHERE D_DPTO = :departamento ORDER BY D_PROV ASC";
         $stmt = $db->prepare($sqlData);
         $stmt->execute([':departamento' => $departamento]);
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -221,7 +219,7 @@ class ConsultaModel extends Model
         $db = self::getDB();
 
         // 1. Obtener Total de Registros (para paginación)
-        $sqlCount = "SELECT COUNT(DISTINCT Distrito) as total FROM escale_colegios WHERE Departamento = :departamento AND Provincia = :provincia";
+        $sqlCount = "SELECT COUNT(DISTINCT D_DIST) as total FROM escale_colegios WHERE D_DPTO = :departamento AND D_PROV = :provincia";
         $stmtCount = $db->prepare($sqlCount);
         $stmtCount->execute([
             ':departamento' => $departamento,
@@ -230,7 +228,7 @@ class ConsultaModel extends Model
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
-        $sqlData = "SELECT DISTINCT Distrito FROM escale_colegios WHERE Departamento = :departamento AND Provincia = :provincia ORDER BY Distrito ASC";
+        $sqlData = "SELECT DISTINCT D_DIST FROM escale_colegios WHERE D_DPTO = :departamento AND D_PROV = :provincia ORDER BY D_DIST ASC";
         $stmt = $db->prepare($sqlData);
         $stmt->execute([
             ':departamento' => $departamento,
