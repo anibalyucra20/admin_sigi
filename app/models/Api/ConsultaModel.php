@@ -127,8 +127,8 @@ class ConsultaModel extends Model
         $term = "%{$termino}%";
 
         // Campos solicitados para la búsqueda
-        $where = "WHERE CodigoModular LIKE :t1 
-                     OR CEN_EDU LIKE :t2";
+        $where = "WHERE (CodigoModular LIKE :t1 
+                     OR CEN_EDU LIKE :t2)";
         $datos = [
             ':t1' => $term,
             ':t2' => $term,
