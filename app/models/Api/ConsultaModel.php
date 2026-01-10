@@ -129,34 +129,29 @@ class ConsultaModel extends Model
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
                      OR CEN_EDU LIKE :t2";
+        $datos = [
+            ':t1' => $term,
+            ':t2' => $term,
+        ];
 
         if ($departamento != '') {
             $where .= " AND D_DPTO = :t3";
-        } else {
-            $where .= " OR D_DPTO = :t3";
+            $datos[':t3'] = $departamento;
         }
         if ($provincia != '') {
             $where .= " AND D_PROV = :t4";
-        } else {
-            $where .= " OR D_PROV = :t4";
+            $datos[':t4'] = $provincia;
         }
         if ($distrito != '') {
             $where .= " AND D_DIST = :t5";
-        } else {
-            $where .= " OR D_DIST = :t5";
+            $datos[':t5'] = $distrito;
         }
 
         // 1. Obtener Total de Registros (para paginación)
         $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
         $stmtCount = $db->prepare($sqlCount);
         // Bind de parámetros (repetimos la variable para cada ? o placeholder)
-        $stmtCount->execute([
-            ':t1' => $term,
-            ':t2' => $term,
-            ':t3' => $departamento,
-            ':t4' => $provincia,
-            ':t5' => $distrito
-        ]);
+        $stmtCount->execute($datos);
         $total = $stmtCount->fetchColumn();
 
         // 2. Obtener Data Paginada
@@ -167,13 +162,7 @@ class ConsultaModel extends Model
                     LIMIT $limit OFFSET $offset";
 
         $stmt = $db->prepare($sqlData);
-        $stmt->execute([
-            ':t1' => $term,
-            ':t2' => $term,
-            ':t3' => $departamento,
-            ':t4' => $provincia,
-            ':t5' => $distrito
-        ]);
+        $stmt->execute($datos);
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return [
