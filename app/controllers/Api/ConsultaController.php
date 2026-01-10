@@ -85,13 +85,16 @@ class ConsultaController extends BaseApiController
         $data = $_GET['data'] ?? '';
         $page = $_GET['page'] ?? 1;
         $limit = $_GET['limit'] ?? 10;
+        $departamento = $_GET['departamento'] ?? '';
+        $provincia = $_GET['provincia'] ?? '';
+        $distrito = $_GET['distrito'] ?? '';
 
         if (empty($data)) {
             $this->error('El parámetro "data" es requerido.', 400, 'BAD_REQUEST');
         }
 
         // 3. Ejecutar Servicio
-        $resultado = $this->service->buscarColegios($data, $this->tenantId, $page, $limit, $this->endpointColegios);
+        $resultado = $this->service->buscarColegios($data, $this->tenantId, $page, $limit, $this->endpointColegios, $departamento, $provincia, $distrito);
 
         // 4. Respuesta
         if (isset($resultado['error'])) {

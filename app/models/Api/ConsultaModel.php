@@ -121,7 +121,7 @@ class ConsultaModel extends Model
     /**
      * Búsqueda paginada en ESCALE
      */
-    public function buscarColegiosLocal($termino, $limit, $offset)
+    public function buscarColegiosLocal($termino, $limit, $offset, $departamento = '', $provincia = '', $distrito = '')
     {
         $db = self::getDB();
         $term = "%{$termino}%";
@@ -129,10 +129,9 @@ class ConsultaModel extends Model
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
                      OR CEN_EDU LIKE :t2 
-                     OR DIR_CEN LIKE :t3 
-                     OR D_DPTO LIKE :t4 
-                     OR D_PROV LIKE :t5 
-                     OR D_DIST LIKE :t6";
+                     OR D_DPTO = :t3 
+                     OR D_PROV = :t4 
+                     OR D_DIST = :t5";
 
         // 1. Obtener Total de Registros (para paginación)
         $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
@@ -141,10 +140,9 @@ class ConsultaModel extends Model
         $stmtCount->execute([
             ':t1' => $term,
             ':t2' => $term,
-            ':t3' => $term,
-            ':t4' => $term,
-            ':t5' => $term,
-            ':t6' => $term
+            ':t3' => $departamento,
+            ':t4' => $provincia,
+            ':t5' => $distrito
         ]);
         $total = $stmtCount->fetchColumn();
 
@@ -159,10 +157,9 @@ class ConsultaModel extends Model
         $stmt->execute([
             ':t1' => $term,
             ':t2' => $term,
-            ':t3' => $term,
-            ':t4' => $term,
-            ':t5' => $term,
-            ':t6' => $term
+            ':t3' => $departamento,
+            ':t4' => $provincia,
+            ':t5' => $distrito
         ]);
         $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

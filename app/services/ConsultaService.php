@@ -121,7 +121,7 @@ class ConsultaService
     /**
      * Lógica para Colegios (Escale)
      */
-    public function buscarColegios($data, $id_ies, $page = 1, $limit = 10, $endpoint = '/api/consulta/colegios/')
+    public function buscarColegios($data, $id_ies, $page = 1, $limit = 10, $endpoint = '/api/consulta/colegios/', $departamento = '', $provincia = '', $distrito = '')
     {
         // 1. Validaciones
         /* if (strlen($data) < 3) {
@@ -144,7 +144,7 @@ class ConsultaService
         $offset = ($page - 1) * $limit;
 
         // 4. Llamada al Modelo
-        $resultado = $this->model->buscarColegiosLocal($data, $limit, $offset);
+        $resultado = $this->model->buscarColegiosLocal($data, $limit, $offset, $departamento, $provincia, $distrito);
 
         // 5. Estructurar Respuesta JSON Paginada
         $meta = [
