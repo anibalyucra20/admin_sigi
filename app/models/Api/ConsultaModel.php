@@ -133,17 +133,17 @@ class ConsultaModel extends Model
         if ($departamento != '') {
             $where .= " AND D_DPTO = :t3";
         } else {
-            $where .= " OR D_DPTO LIKE %:t3%";
+            $where .= " OR D_DPTO = :t3";
         }
         if ($provincia != '') {
             $where .= " AND D_PROV = :t4";
         } else {
-            $where .= " OR D_PROV LIKE %:t4%";
+            $where .= " OR D_PROV = :t4";
         }
         if ($distrito != '') {
             $where .= " AND D_DIST = :t5";
         } else {
-            $where .= " OR D_DIST LIKE %:t5%";
+            $where .= " OR D_DIST = :t5";
         }
 
         // 1. Obtener Total de Registros (para paginación)
