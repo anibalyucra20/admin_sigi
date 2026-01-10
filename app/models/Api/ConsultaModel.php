@@ -128,22 +128,22 @@ class ConsultaModel extends Model
 
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
-                     OR CEN_EDU LIKE :t2 ";
+                     OR CEN_EDU LIKE :t2";
 
         if ($departamento != '') {
-            $where .= "AND D_DPTO = :t3";
+            $where .= " AND D_DPTO = :t3";
         } else {
-            $where .= "AND D_DPTO LIKE :t3";
+            $where .= " OR D_DPTO LIKE :t3";
         }
         if ($provincia != '') {
-            $where .= "AND D_PROV = :t4";
+            $where .= " AND D_PROV = :t4";
         } else {
-            $where .= "AND D_PROV LIKE :t4";
+            $where .= " OR D_PROV LIKE :t4";
         }
         if ($distrito != '') {
-            $where .= "AND D_DIST = :t5";
+            $where .= " AND D_DIST = :t5";
         } else {
-            $where .= "AND D_DIST LIKE :t5";
+            $where .= " OR D_DIST LIKE :t5";
         }
 
         // 1. Obtener Total de Registros (para paginación)
