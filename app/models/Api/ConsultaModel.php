@@ -128,10 +128,17 @@ class ConsultaModel extends Model
 
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
-                     OR CEN_EDU LIKE :t2 
-                     AND D_DPTO = :t3 
-                     AND D_PROV = :t4 
-                     AND D_DIST = :t5";
+                     OR CEN_EDU LIKE :t2 ";
+
+        if ($departamento != '') {
+            $where .= "AND D_DPTO = :t3";
+        }
+        if ($provincia != '') {
+            $where .= "AND D_PROV = :t4";
+        }
+        if ($distrito != '') {
+            $where .= "AND D_DIST = :t5";
+        }
 
         // 1. Obtener Total de Registros (para paginación)
         $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
