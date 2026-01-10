@@ -129,9 +129,9 @@ class ConsultaModel extends Model
         // Campos solicitados para la búsqueda
         $where = "WHERE CodigoModular LIKE :t1 
                      OR CEN_EDU LIKE :t2 
-                     OR D_DPTO = :t3 
-                     OR D_PROV = :t4 
-                     OR D_DIST = :t5";
+                     AND D_DPTO = :t3 
+                     AND D_PROV = :t4 
+                     AND D_DIST = :t5";
 
         // 1. Obtener Total de Registros (para paginación)
         $sqlCount = "SELECT COUNT(*) as total FROM escale_colegios $where";
