@@ -60,7 +60,7 @@ class MicrosoftService
             return ['success' => true, 'token' => $ies['MICROSOFT_TOKEN_DINAMICO'], 'msg' => 'Token encontrado en la base de datos'];
         }
     }
-    public function syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_CLIENT_ID, $MICROSOFT_CLIENT_SECRET, $MICROSOFT_TENANT_ID, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE)
+    public function syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE)
     {
         $token = $this->getToken($id_ies);
         $respuesta = [];

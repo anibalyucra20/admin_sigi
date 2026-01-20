@@ -80,15 +80,11 @@ class IntegracionController extends BaseApiController
             $estado_post = $data['estado'] ?? 1;
             $estado = $estado_post == 1 ? true : false;
             try {
-                $MICROSOFT_CLIENT_ID = $ies['MICROSOFT_CLIENT_ID'];
-                $MICROSOFT_CLIENT_SECRET = $ies['MICROSOFT_CLIENT_SECRET'];
-                $MICROSOFT_TENANT_ID = $ies['MICROSOFT_TENANT_ID'];
-
                 $MICROSOFT_SKU_ID_DOCENTE = $ies['MICROSOFT_SKU_ID_DOCENTE'];
                 $MICROSOFT_SKU_ID_ESTUDIANTE = $ies['MICROSOFT_SKU_ID_ESTUDIANTE'];
                 //obtencion de token
 
-                $resultado = $this->serviceMicrosoft->syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_CLIENT_ID, $MICROSOFT_CLIENT_SECRET, $MICROSOFT_TENANT_ID, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE);
+                $resultado = $this->serviceMicrosoft->syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE);
                 if ($resultado['success']) {
                     $responseApi['microsoft'] = $resultado;
                 } else {
