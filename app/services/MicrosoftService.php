@@ -80,12 +80,13 @@ class MicrosoftService
             $userPayload = [
                 'accountEnabled' => $estado,
                 'displayName' => $nombres . ' ' . $apellidos,
+                'mail' => $email,
                 'mailNickname' => $dni,
                 'userPrincipalName' => $email,
                 'surname' => $apellidos,
                 'givenName' => $nombres,
                 'jobTitle' => $tipo_usuario,
-                'departament' => $programa_estudios,
+                'department' => $programa_estudios,
                 'preferredLanguage' => 'es-ES',
                 'usageLocation' => 'PE',
             ];

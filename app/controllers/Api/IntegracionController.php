@@ -73,7 +73,7 @@ class IntegracionController extends BaseApiController
         //---------------------- FIN INTEGRACION MOODLE --------------------------
         //---------------------- INICIO INTEGRACION MICROSOFT --------------------------
         if ($ies['MICROSOFT_SYNC_ACTIVE'] > 0) {
-            $programa_estudios = $_POST['programa_estudios'] ?? '';
+            $programa_estudios = $_POST['programa_estudios'];
             $tipo_usuario = $_POST['tipo_usuario'] ?? 'ESTUDIANTE';
             $estado_post = $_POST['estado'] ?? 1;
             $estado = $estado_post == 1 ? true : false;
