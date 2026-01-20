@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models\Admin;
 
 use Core\Model;
@@ -105,5 +106,12 @@ class Ies extends Model
                                   SET estado='activa', suspendido_at=NULL, suspendido_motivo=NULL, updated_at=NOW()
                                   WHERE id=:id");
         return $st->execute([':id' => $id]);
+    }
+    public function actualizarTokenMicrosoft(int $id_ies, string $token, string $fecha_expiracion): bool
+    {
+        $st = self::$db->prepare("UPDATE {$this->table}
+                                  SET MICROSOFT_TOKEN_DINAMICO=:token, MICROSOFT_TOKEN_EXPIRE=:fecha_expiracion, updated_at=NOW()
+                                  WHERE id=:id_ies");
+        return $st->execute([':id_ies' => $id_ies, ':token' => $token, ':fecha_expiracion' => $fecha_expiracion]);
     }
 }
