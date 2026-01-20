@@ -105,6 +105,11 @@ class IntegracionController extends BaseApiController
             'ok' => true,
             'data' => $_POST['data']
         ]);
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        echo "<pre>";
+        print_r($data);
+        echo "</pre>";
     }
     //=============================== FIN INTEGRACIONES ===============================
 }
