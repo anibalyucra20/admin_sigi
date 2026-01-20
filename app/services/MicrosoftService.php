@@ -80,7 +80,6 @@ class MicrosoftService
             $userPayload = [
                 'accountEnabled' => $estado,
                 'displayName' => $nombres . ' ' . $apellidos,
-                'mail' => $email,
                 'mailNickname' => $dni,
                 'userPrincipalName' => $email,
                 'surname' => $apellidos,
@@ -98,7 +97,7 @@ class MicrosoftService
             }
             if ($passwordPlano == null && $id_microsoft == null) {
                 $parteAleatoria = bin2hex(random_bytes(6)); // Esta es la que enviaremos a Moodle
-                $passforMicrosoft = 'Si.gi' . $parteAleatoria;
+                $passforMicrosoft = 'Sigi.' . $parteAleatoria;
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passforMicrosoft
