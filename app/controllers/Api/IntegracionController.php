@@ -101,15 +101,12 @@ class IntegracionController extends BaseApiController
         //---------------------- FIN INTEGRACION MICROSOFT --------------------------
 
         // Estructura limpia con paginación
-        $this->json([
-            'ok' => true,
-            'data' => $_POST['data']
-        ]);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
-        echo "<pre>";
-        print_r($data);
-        echo "</pre>";
+        $this->json([
+            'ok' => true,
+            'data' => $data
+        ]);
     }
     //=============================== FIN INTEGRACIONES ===============================
 }
