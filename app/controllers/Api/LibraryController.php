@@ -224,12 +224,10 @@ class LibraryController extends BaseApiController
     {
         $this->requireApiKey('/api/library/adopt');
         $this->maybeReplayIdem();
-
         $libroId = (int)$libroId;
         if ($libroId <= 0) {
             $this->error('libro_id inválido', 422, 'VALIDATION');
         }
-
         // 1) El libro debe existir
         $st = $this->db->prepare("SELECT id_ies FROM biblioteca_libros WHERE id=? LIMIT 1");
         $st->execute([$libroId]);
@@ -237,7 +235,6 @@ class LibraryController extends BaseApiController
         if ($ownerIes === false) {
             $this->error('Libro no existe', 404, 'NOT_FOUND');
         }
-
         // 2) Cadena académica obligatoria
         $body = $_POST ?: (json_decode(file_get_contents('php://input'), true) ?? []);
         $req  = ['id_programa_estudio', 'id_plan', 'id_modulo_formativo', 'id_semestre', 'id_unidad_didactica'];
@@ -246,7 +243,6 @@ class LibraryController extends BaseApiController
             $body[$k] = (int)$body[$k];
             if ($body[$k] <= 0) $this->error("$k inválido", 422, 'VALIDATION');
         }
-
         // 4) Insert idempotente en biblioteca_vinculos
         $sql = "INSERT INTO biblioteca_vinculos
             (id_ies, id_libro, id_programa_estudio, id_plan, id_modulo_formativo, id_semestre, id_unidad_didactica, created_at)
