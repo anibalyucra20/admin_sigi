@@ -28,7 +28,7 @@ class LibraryController extends BaseApiController
     /* ========== POST /api/library/upload (multipart/form-data) ========== */
     public function upload()
     {
-        $this->requireApiKey(); // protege el endpoint
+        $this->requireApiKey('/api/library/upload'); // protege el endpoint
 
         // --- Config de almacenamiento ---
         $publicRoot = realpath(__DIR__ . '/../../../public');
@@ -219,11 +219,10 @@ class LibraryController extends BaseApiController
             return $this->json(['ok' => false, 'error' => ['code' => 'EXCEPTION', 'message' => $e->getMessage()]], 500);
         }
     }
-
     /* ========== POST /api/library/adopt/{libro_id} ========== */
     public function adopt($libroId)
     {
-        $this->requireApiKey();
+        $this->requireApiKey('/api/library/adopt');
         $this->maybeReplayIdem();
 
         $libroId = (int)$libroId;
@@ -280,7 +279,7 @@ class LibraryController extends BaseApiController
     /* ========== DELETE /api/library/adopt/{libro_id} ========== */
     public function unadopt($libroId)
     {
-        $this->requireApiKey();
+        $this->requireApiKey('/api/library/adopt');
         $libroId = (int)$libroId;
         $body = $_POST ?: (json_decode(file_get_contents('php://input'), true) ?? []);
 
@@ -396,7 +395,7 @@ class LibraryController extends BaseApiController
     /* ========== GET /api/library/show/{id} ========== */
     public function show($id)
     {
-        $this->requireApiKey();
+        $this->requireApiKey('/api/library/show');
         $id = (int)$id;
         $st = $this->db->prepare("SELECT * FROM biblioteca_libros WHERE id=?");
         $st->execute([$id]);
@@ -414,7 +413,7 @@ class LibraryController extends BaseApiController
     /* ========== GET /api/library/adopted ========== */
     public function adopted()
     {
-        $this->requireApiKey();
+        $this->requireApiKey('/api/library/adopted');
 
         // --- paginación ---
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -513,7 +512,7 @@ class LibraryController extends BaseApiController
 
     public function update($id)
     {
-        $this->requireApiKey();           // protege con API key
+        $this->requireApiKey('/api/library/update');           // protege con API key
         $this->maybeReplayIdem();         // soporta idempotencia (si lo usas)
 
         $id = (int)$id;
@@ -658,7 +657,7 @@ class LibraryController extends BaseApiController
     /* ========== GET /api/library/batch?ids=1,2,3 ========== */
     public function batch()
     {
-        $this->requireApiKey();
+        $this->requireApiKey('/api/library/batch');
 
         // 1) Parseo y saneo de ids
         $idsParam = trim((string)($_GET['ids'] ?? ''));

@@ -53,7 +53,7 @@ class MoodleService
 
             // Llamamos a la función de UPDATE
             $this->call('core_user_update_users', ['users' => [$userPayload]], $MOODLE_URL, $MOODLE_TOKEN);
-            $respuesta['message_success'] .= 'Usuario actualizado en Moodle.';
+            $respuesta['message_success'] .= '<br>Usuario actualizado en Moodle.';
             $respuesta['id'] = $moodleInternalId;
             return $respuesta;
         }
