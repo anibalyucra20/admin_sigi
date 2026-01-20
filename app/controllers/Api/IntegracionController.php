@@ -103,7 +103,7 @@ class IntegracionController extends BaseApiController
         // Estructura limpia con paginación
         $this->json([
             'ok' => true,
-            'data' => $id_ies
+            'data' => $_POST['data']
         ]);
     }
     //=============================== FIN INTEGRACIONES ===============================
