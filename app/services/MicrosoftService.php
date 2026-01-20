@@ -85,7 +85,7 @@ class MicrosoftService
                 'surname' => $apellidos,
                 'givenName' => $nombres,
                 'jobTitle' => $tipo_usuario,
-                'department' => $programa_estudios,
+                'departament' => $programa_estudios,
                 'preferredLanguage' => 'es-ES',
                 'usageLocation' => 'PE',
             ];
