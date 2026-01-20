@@ -56,7 +56,7 @@ class IntegracionController extends BaseApiController
 
         $responseApi = [];
         //---------------------- INICIO INTEGRACION MOODLE --------------------------
-        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+        /*if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
             try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
@@ -97,13 +97,13 @@ class IntegracionController extends BaseApiController
             }
         } else {
             $responseApi['microsoft']['message_error'] = "No cuenta con integración con Microsoft";
-        }
+        }*/
         //---------------------- FIN INTEGRACION MICROSOFT --------------------------
 
         // Estructura limpia con paginación
         $this->json([
             'ok' => true,
-            'data' => $responseApi
+            'data' => $_POST['dni']
         ]);
     }
     //=============================== FIN INTEGRACIONES ===============================
