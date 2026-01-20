@@ -251,4 +251,35 @@ class MicrosoftService
             return ['success' => false, 'details' => $token['msg']];
         }
     }
+
+
+    public function getAutoLoginUrl($sigiUserId, $MOODLE_URL, $MOODLE_SSO_KEY, $hacia = null, $id = null)
+    {
+        if (!isset($MOODLE_SSO_KEY)) return '#';
+        $datos = [
+            'uid'  => $sigiUserId,
+            'time' => time()
+        ];
+        if ($hacia) {
+            $datos['hacia'] = $hacia;
+        }
+        if ($id) {
+            $datos['id'] = $id;
+        }
+        // 1. Datos a encriptar: ID + Timestamp (para que el link caduque en 60 seg)
+        $data = json_encode($datos);
+
+        // 2. Encriptación AES-256-CBC
+        $method = "AES-256-CBC";
+        $key = hash('sha256', $MOODLE_SSO_KEY);
+        $iv = substr(hash('sha256', 'iv_secret'), 0, 16); // Vector de inicialización fijo o dinámico
+
+        $encrypted = openssl_encrypt($data, $method, $key, 0, $iv);
+
+        // 3. Generar URL segura (urlencode es vital)
+        $token = urlencode(base64_encode($encrypted));
+
+        // Asumimos que crearemos una carpeta "local/sigi" en moodle
+        return $MOODLE_URL . "/local/sigi/sso.php?token=" . $token;
+    }
 }

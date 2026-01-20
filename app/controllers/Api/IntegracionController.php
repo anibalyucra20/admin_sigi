@@ -20,6 +20,7 @@ class IntegracionController extends BaseApiController
     private $objConsulta;
     private $objIes;
     private $endpointSynUserIntegraciones = "/api/consulta/sync_user_integraciones/";
+    private $endpointLoginMoodle = "/api/consulta/login_user_Moodle/";
     private $endpointCourseMoodle = "/api/consulta/course_moodle/";
     private $endpointCategoryMoodle = "/api/consulta/category_moodle/";
     private $endpointUserMicrosoft = "/api/consulta/sync_user_integraciones/";
@@ -104,6 +105,29 @@ class IntegracionController extends BaseApiController
             'ok' => true,
             'data' => $responseApi
         ]);
+    }
+
+    public function loginMoodle()
+    {
+        $this->requireApiKey($this->endpointLoginMoodle);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            $json_data = file_get_contents('php://input');
+            $data = json_decode($json_data, true);
+            $id_user = $data['idUsuarioSigi'];
+            $hacia = $data['a'];
+            $id = $data['id'];
+            $this->json([
+                'ok' => true,
+                'url' => $this->serviceMicrosoft->getAutoLoginUrl($id_user, $ies['MOODLE_URL'], $ies['MOODLE_SSO_KEY'], $hacia, $id)
+            ]);
+        } else {
+            $this->json([
+                'ok' => false,
+                'message_error' => 'No cuenta con integración con Moodle'
+            ]);
+        }
     }
     //=============================== FIN INTEGRACIONES ===============================
 }
