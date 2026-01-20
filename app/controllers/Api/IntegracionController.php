@@ -41,22 +41,24 @@ class IntegracionController extends BaseApiController
     //=============================== INICIO INTEGRACIONES ===============================
     public function syncUserIntegraciones()
     {
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
         // 1. Seguridad: Valida X-Api-Key, Suscripción y obtiene Tenant ID
         $this->requireApiKey($this->endpointSynUserIntegraciones);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $MICROSOFT_SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
 
-        $sigiId = $_POST['sigiId'];
-        $dni = $_POST['dni'];
+        $sigiId = $data['id'];
+        $dni = $data['dni'];
         $email = $dni . $MICROSOFT_SUFIJO_EMAIL;
-        $nombres = $_POST['nombres'];
-        $apellidos = $_POST['apellidos'];
-        $passwordPlano = $_POST['passwordPlano'] ?? null;
+        $nombres = $data['nombres'];
+        $apellidos = $data['apellidos'];
+        $passwordPlano = $data['passwordPlano'] ?? null;
 
         $responseApi = [];
         //---------------------- INICIO INTEGRACION MOODLE --------------------------
-        /*if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
             try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
@@ -73,9 +75,9 @@ class IntegracionController extends BaseApiController
         //---------------------- FIN INTEGRACION MOODLE --------------------------
         //---------------------- INICIO INTEGRACION MICROSOFT --------------------------
         if ($ies['MICROSOFT_SYNC_ACTIVE'] > 0) {
-            $programa_estudios = $_POST['programa_estudios'];
-            $tipo_usuario = $_POST['tipo_usuario'] ?? 'ESTUDIANTE';
-            $estado_post = $_POST['estado'] ?? 1;
+            $programa_estudios = $data['programa_estudios'];
+            $tipo_usuario = $data['tipo_usuario'] ?? 'ESTUDIANTE';
+            $estado_post = $data['estado'] ?? 1;
             $estado = $estado_post == 1 ? true : false;
             try {
                 $MICROSOFT_CLIENT_ID = $ies['MICROSOFT_CLIENT_ID'];
@@ -97,15 +99,14 @@ class IntegracionController extends BaseApiController
             }
         } else {
             $responseApi['microsoft']['message_error'] = "No cuenta con integración con Microsoft";
-        }*/
+        }
         //---------------------- FIN INTEGRACION MICROSOFT --------------------------
 
         // Estructura limpia con paginación
-        $json_data = file_get_contents('php://input');
-        $data = json_decode($json_data, true);
+
         $this->json([
             'ok' => true,
-            'data' => $data
+            'data' => $responseApi
         ]);
     }
     //=============================== FIN INTEGRACIONES ===============================
