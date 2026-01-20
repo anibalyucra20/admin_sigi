@@ -50,7 +50,7 @@ class MicrosoftService
                 $seconds_to_expire = $data['expires_in'] - 600;
                 $new_expire_in = date('Y-m-d H:i:s', time() + $seconds_to_expire);
                 // Aquí ya puedes guardar en BD sin errores
-                $this->objIes->actualizarTokenMicrosoft($ies['id_ies'], $data['access_token'], $new_expire_in);
+                $this->objIes->actualizarTokenMicrosoft($id_ies, $data['access_token'], $new_expire_in);
                 return ['success' => true, 'token' => $data['access_token'], 'msg' => 'Token obtenido correctamente']; // Retornamos el array limpio
             } else {
                 // Manejo de error si Microsoft rechaza las credenciales
