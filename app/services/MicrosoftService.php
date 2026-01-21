@@ -380,6 +380,7 @@ class MicrosoftService
                                 ]
                             ];
                         } else {
+                            sleep(1);
                             $correosearch = $datosOriginales['dni'] . $sufijoCorreo;
                             $user = $this->searchUserMicrosoft($correosearch, $id_ies);
                             // Guardar error con el ID de SIGI para saber quién falló
