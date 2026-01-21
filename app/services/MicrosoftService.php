@@ -389,6 +389,7 @@ class MicrosoftService
                                     'status' => true,
                                     'id_sigi' => $idSigi,          // <--- Vinculación para tu BD
                                     'id_microsoft' => $user['id_microsoft'],  // <--- Vinculación para tu BD
+                                    'correo' => $correosearch
                                 ];
                             } else {
                                 // Guardar error con el ID de SIGI para saber quién falló
