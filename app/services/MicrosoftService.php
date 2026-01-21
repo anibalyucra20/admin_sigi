@@ -352,7 +352,7 @@ class MicrosoftService
 
                         // Recalculamos la licencia correcta para ESTE usuario específico
                         // (Corrección del bug de licencias mezcladas)
-                        $skuParaEsteUsuario = ($datosOriginales['tipo'] != 'ESTUDIANTE') ? $skuIdDocente : $skuIdEstudiante;
+                        $skuParaEsteUsuario = ($datosOriginales['tipo_usuario'] != 'ESTUDIANTE') ? $skuIdDocente : $skuIdEstudiante;
 
                         // Si se creó correctamente (201 Created)
                         if ($resp['status'] == 201 && isset($resp['body']['id'])) {
