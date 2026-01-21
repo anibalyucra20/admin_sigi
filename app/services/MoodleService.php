@@ -169,7 +169,7 @@ class MoodleService
                 foreach ($response as $key => $moodleUser) {
                     if (isset($moodleUser['id'])) {
                         $usuarios_vinculados[] = [
-                            'id_sigi'   => $usuarios[$key]['id'], // Usamos DNI como clave de búsqueda
+                            'id_sigi'   => $usuarios[$key]['idnumber'],
                             'moodle_id' => $moodleUser['id']
                         ];
                     }
