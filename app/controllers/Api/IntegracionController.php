@@ -151,7 +151,7 @@ class IntegracionController extends BaseApiController
             $responseApi['microsoft_ok'] = false;
             $responseApi['microsoft']['message_error'] = 'No cuenta con integración con Microsoft';
         }
-        if ($responseApi['moodle_ok'] && $responseApi['microsoft_ok']) {
+        if ($responseApi['moodle_ok'] || $responseApi['microsoft_ok']) {
             $responseApi['success'] = true;
         } else {
             $responseApi['success'] = false;
