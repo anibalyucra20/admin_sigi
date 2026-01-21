@@ -99,8 +99,8 @@ class MicrosoftService
                 ];
             } elseif ($id_microsoft == null) {
                 // Si es usuario nuevo y no vino password, generar uno aleatorio
-                $parteAleatoria = bin2hex(random_bytes(6));
-                $passforMicrosoft = 'Sigi.' . $parteAleatoria;
+                $parteAleatoria = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
+                $passforMicrosoft = 'Sigi.' . $parteAleatoria . '!';
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passforMicrosoft
@@ -140,7 +140,6 @@ class MicrosoftService
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $data = json_decode($raw_response, true);
-            sleep(4);
             // LOGICA DE RESPUESTA
             if ($method == "PATCH") {
                 if ($http_code == 204 || $http_code == 200) {
