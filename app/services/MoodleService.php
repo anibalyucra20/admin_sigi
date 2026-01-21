@@ -181,7 +181,8 @@ class MoodleService
                 'total_recibidos' => count($usuarios),
                 'moodle_procesados' => count($usuarios),
                 'errores_moodle_detalle' => [],
-                'data' => $usuarios_vinculados // <--- AQUÍ VAN LOS IDS
+                'data' => $usuarios_vinculados, // <--- AQUÍ VAN LOS IDS
+                'response' => $response // <--- AQUÍ VAN LOS IDS
             ];
         }
 
