@@ -99,8 +99,7 @@ class MicrosoftService
                 ];
             } elseif ($id_microsoft == null) {
                 // Si es usuario nuevo y no vino password, generar uno aleatorio
-                $parteAleatoria = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
-                $passforMicrosoft = 'Sigi.' . $parteAleatoria . '!';
+                $passforMicrosoft = \Core\Auth::crearPassword(8);
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passforMicrosoft

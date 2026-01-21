@@ -59,8 +59,7 @@ class MoodleService
         }
         // Generar contraseña aleatoria en caso que no enviaron para actualizar y no enviaron contraseña
         if ($passwordPlano == null) {
-            $parteAleatoria = bin2hex(random_bytes(6)); // Esta es la que enviaremos a Moodle
-            $passwordPlano = 'Sigi.' . $parteAleatoria;
+            $passwordPlano = \Core\Auth::crearPassword(8);
             $userPayload['password'] = $passwordPlano;
         }
         // CASO B: CREAR (Si no existe)

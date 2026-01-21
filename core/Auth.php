@@ -23,7 +23,12 @@ class Auth
         // Regenerar ID para evitar session fixation
         session_regenerate_id(true);
     }
-
+    public static function crearPassword(int $longitud = 8)
+    {
+        $parteAleatoria = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, $longitud);
+        $password = 'Sigi.' . $parteAleatoria . '!';
+        return $password;
+    }
     public static function user(): ?array
     {
         self::start();
