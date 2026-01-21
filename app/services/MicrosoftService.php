@@ -380,12 +380,15 @@ class MicrosoftService
                                 ]
                             ];
                         } else {
+                            $correosearch = $datosOriginales['dni'] . $sufijoCorreo;
+                            $user = $this->searchUserMicrosoft($correosearch, $id_ies);
                             // Guardar error con el ID de SIGI para saber quién falló
                             $errorMsg = isset($resp['body']['error']['message']) ? $resp['body']['error']['message'] : 'Error desconocido';
 
                             $informeFinal[] = [
                                 'status' => false,
                                 'id_sigi' => $idSigi, // <--- Importante para reportar error
+                                'id_microsoft' => $user['user']['id'],
                                 'msg' => $errorMsg
                             ];
                         }
