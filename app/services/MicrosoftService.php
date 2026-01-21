@@ -381,16 +381,25 @@ class MicrosoftService
                             ];
                         } else {
                             $correosearch = $datosOriginales['dni'] . $sufijoCorreo;
-                            $user = $this->searchUserMicrosoft($correosearch, $id_ies);
-                            // Guardar error con el ID de SIGI para saber quién falló
-                            $errorMsg = isset($resp['body']['error']['message']) ? $resp['body']['error']['message'] : 'Error desconocido';
-
-                            $informeFinal[] = [
-                                'status' => false,
-                                'id_sigi' => $idSigi, // <--- Importante para reportar error
-                                'id_microsoft' => $user['user']['id'],
-                                'msg' => $errorMsg
-                            ];
+                            //se podria realizar llamar a la funcion syncUserMicrosoft para sincronizar el usuario
+                            //$user = $this->searchUserMicrosoft($correosearch, $id_ies);
+                            $user = $this->syncUserMicrosoft($id_ies, $idSigi, $datosOriginales['dni'], $correosearch, $datosOriginales['nombres'], $datosOriginales['apellidos'], $datosOriginales['passwordPlano'], $datosOriginales['programa_estudios'], $datosOriginales['tipo_usuario'], $datosOriginales['estado'], $skuIdDocente, $skuIdEstudiante);
+                            if ($user['success'] == true) {
+                                $informeFinal[] = [
+                                    'status' => true,
+                                    'id_sigi' => $idSigi,          // <--- Vinculación para tu BD
+                                    'id_microsoft' => $user['id_microsoft'],  // <--- Vinculación para tu BD
+                                ];
+                            } else {
+                                // Guardar error con el ID de SIGI para saber quién falló
+                                $errorMsg = isset($resp['body']['error']['message']) ? $resp['body']['error']['message'] : 'Error desconocido';
+                                $informeFinal[] = [
+                                    'status' => false,
+                                    'id_sigi' => $idSigi, // <--- Importante para reportar error
+                                    'id_microsoft' => $user['id_microsoft'],
+                                    'msg' => $errorMsg
+                                ];
+                            }
                         }
                     }
                 }
