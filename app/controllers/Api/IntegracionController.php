@@ -108,6 +108,7 @@ class IntegracionController extends BaseApiController
     }
     public function sincronizarUsuariosMasivos()
     {
+        $responseApi = [];
         $this->requireApiKey($this->endpointSynUserIntegraciones);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
@@ -135,29 +136,22 @@ class IntegracionController extends BaseApiController
                     ]
                 ];
             }
-            $this->json([
-                'ok_moodle' => true,
-                'data_moodle' => $this->serviceMoodle->registrarLoteMasivo($MOODLE_URL, $MOODLE_TOKEN, $usersPayload)
-            ]);
+            $responseApi['moodle_ok'] = true;
+            $responseApi['moodle'] = $this->serviceMoodle->registrarLoteMasivo($MOODLE_URL, $MOODLE_TOKEN, $usersPayload);
         } else {
-            $this->json([
-                'ok_moodle' => false,
-                'message_error_moodle' => 'No cuenta con integración con Moodle'
-            ]);
+            $responseApi['moodle_ok'] = false;
+            $responseApi['moodle']['message_error'] = 'No cuenta con integración con Moodle';
         }
         if ($ies['MICROSOFT_SYNC_ACTIVE'] > 0) {
             $MICROSOFT_SKU_ID_DOCENTE = $ies['MICROSOFT_SKU_ID_DOCENTE'];
             $MICROSOFT_SKU_ID_ESTUDIANTE = $ies['MICROSOFT_SKU_ID_ESTUDIANTE'];
-            $this->json([
-                'ok_microsoft' => true,
-                'data_microsoft' => $this->serviceMicrosoft->registrarLoteMasivo($id_ies, $data, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE, $SUFIJO_EMAIL)
-            ]);
+            $responseApi['microsoft_ok'] = true;
+            $responseApi['microsoft'] = $this->serviceMicrosoft->registrarLoteMasivo($id_ies, $data, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE, $SUFIJO_EMAIL);
         } else {
-            $this->json([
-                'ok_microsoft' => false,
-                'message_error_microsoft' => 'No cuenta con integración con Microsoft'
-            ]);
+            $responseApi['microsoft_ok'] = false;
+            $responseApi['microsoft']['message_error'] = 'No cuenta con integración con Microsoft';
         }
+        $this->json($responseApi);
     }
 
     public function loginMoodle()
