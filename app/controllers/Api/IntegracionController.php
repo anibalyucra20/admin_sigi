@@ -106,6 +106,59 @@ class IntegracionController extends BaseApiController
             'data' => $responseApi
         ]);
     }
+    public function sincronizarUsuariosMasivos()
+    {
+        $this->requireApiKey($this->endpointSynUserIntegraciones);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        $SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            $MOODLE_URL = $ies['MOODLE_URL'];
+            $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+            $usersPayload = [];
+            foreach ($data as $usr) {
+                // Validar correo para evitar error fatal en Moodle
+                $email = $usr['dni'] . $SUFIJO_EMAIL;
+                // Mapeo: Array que llega de SIGI Local -> Array que pide Moodle
+                $usersPayload[] = [
+                    'username'      => $usr['dni'],
+                    'password'      => $usr['passwordPlano'], // La clave plana "Sigi..." que enviaste
+                    'firstname'     => $usr['nombres'],
+                    'lastname'      => $usr['apellidos'],
+                    'email'         => $email,
+                    'auth'          => 'manual',
+                    'idnumber'      => (string)$usr['id'], // VINCULACIÓN: ID de SIGI Local
+                    'preferences'   => [
+                        ['type'  => 'auth_forcepasswordchange', 'value' => 0]
+                    ]
+                ];
+            }
+            $this->json([
+                'ok_moodle' => true,
+                'data_moodle' => $this->serviceMoodle->registrarLoteMasivo($MOODLE_URL, $MOODLE_TOKEN, $usersPayload)
+            ]);
+        } else {
+            $this->json([
+                'ok_moodle' => false,
+                'message_error_moodle' => 'No cuenta con integración con Moodle'
+            ]);
+        }
+        if ($ies['MICROSOFT_SYNC_ACTIVE'] > 0) {
+            $MICROSOFT_SKU_ID_DOCENTE = $ies['MICROSOFT_SKU_ID_DOCENTE'];
+            $MICROSOFT_SKU_ID_ESTUDIANTE = $ies['MICROSOFT_SKU_ID_ESTUDIANTE'];
+            $this->json([
+                'ok_microsoft' => true,
+                'data_microsoft' => $this->serviceMicrosoft->registrarLoteMasivo($id_ies, $data, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE, $SUFIJO_EMAIL)
+            ]);
+        } else {
+            $this->json([
+                'ok_microsoft' => false,
+                'message_error_microsoft' => 'No cuenta con integración con Microsoft'
+            ]);
+        }
+    }
 
     public function loginMoodle()
     {
@@ -120,7 +173,7 @@ class IntegracionController extends BaseApiController
             $id = $data['id'];
             $this->json([
                 'ok' => true,
-                'url' => $this->serviceMicrosoft->getAutoLoginUrl($id_user, $ies['MOODLE_URL'], $ies['MOODLE_SSO_KEY'], $hacia, $id)
+                'url' => $this->serviceMoodle->getAutoLoginUrl($id_user, $ies['MOODLE_URL'], $ies['MOODLE_SSO_KEY'], $hacia, $id)
             ]);
         } else {
             $this->json([

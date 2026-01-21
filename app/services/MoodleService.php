@@ -121,9 +121,9 @@ class MoodleService
      * @param int $sigiUserId El ID del usuario en SIGI (que es el idnumber en Moodle)
      * @return string URL completa para redirigir
      */
-    public function getAutoLoginUrl($MOODLE_URL, $MOODLE_SSO_KEY, $sigiUserId, $hacia = null, $id = null)
+    public function getAutoLoginUrl($sigiUserId, $MOODLE_URL, $MOODLE_SSO_KEY, $hacia = null, $id = null)
     {
-        if (!$MOODLE_SSO_KEY) return '#';
+        if (!isset($MOODLE_SSO_KEY)) return '#';
         $datos = [
             'uid'  => $sigiUserId,
             'time' => time()
@@ -149,5 +149,80 @@ class MoodleService
 
         // Asumimos que crearemos una carpeta "local/sigi" en moodle
         return $MOODLE_URL . "/local/sigi/sso.php?token=" . $token;
+    }
+    // Método principal llamado por tu controlador
+    public function registrarLoteMasivo($MOODLE_URL, $MOODLE_TOKEN, $usuarios)
+    {
+        // Array para guardar la relación: DNI (o SigiID) -> MoodleID
+        $usuarios_vinculados = [];
+
+        // -------------------------------------------------------
+        // PLAN A: Intentar inserción masiva (RÁPIDO)
+        // -------------------------------------------------------
+        $response = $this->call('core_user_create_users', ['users' => $usuarios], $MOODLE_URL, $MOODLE_TOKEN);
+
+        // Si NO hay excepción, todo salió perfecto
+        if (!isset($response['exception'])) {
+
+            // CAPTURA DE IDS (PLAN A):
+            // Moodle devuelve un array: [['id' => 101, 'username' => '7019...'], ...]
+            if (is_array($response)) {
+                foreach ($response as $moodleUser) {
+                    if (isset($moodleUser['id'])) {
+                        $usuarios_vinculados[] = [
+                            'id_sigi'       => $moodleUser['idnumber'], // Usamos DNI como clave de búsqueda
+                            'moodle_id' => $moodleUser['id']
+                        ];
+                    }
+                }
+            }
+
+            return [
+                'ok' => true,
+                'total_recibidos' => count($usuarios),
+                'moodle_procesados' => count($usuarios),
+                'errores_moodle_detalle' => [],
+                'data' => $usuarios_vinculados // <--- AQUÍ VAN LOS IDS
+            ];
+        }
+
+        // -------------------------------------------------------
+        // PLAN B: UNO POR UNO (Lento pero seguro + Fallback)
+        // -------------------------------------------------------
+        $creadosMoodle = 0;
+        $erroresMoodle = [];
+
+        foreach ($usuarios as $singleUser) {
+            $sigiId = $singleUser['idnumber'];
+            $dni = $singleUser['username'];
+            $email = $singleUser['email'];
+            $nombres = $singleUser['firstname'];
+            $apellidos = $singleUser['lastname'];
+            $passwordPlano = $singleUser['password'];
+
+            // Tu llamada syncUser intacta
+            $indivResp = $this->syncUser($MOODLE_URL, $MOODLE_TOKEN, '', $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
+
+            if ($indivResp['id'] !== false) {
+                $creadosMoodle++;
+
+                // CAPTURA DE IDS (PLAN B):
+                $usuarios_vinculados[] = [
+                    'id_sigi'   => $sigiId,
+                    'moodle_id' => $indivResp['id']
+                ];
+            } else {
+                $msg = $indivResp['message_error'] ?? 'Error desconocido';
+                $erroresMoodle[] = "DNI {$dni}: " . $msg;
+            }
+        }
+
+        return [
+            'ok' => true,
+            'total_recibidos' => count($usuarios),
+            'moodle_procesados' => $creadosMoodle,
+            'errores_moodle_detalle' => $erroresMoodle,
+            'data' => $usuarios_vinculados // <--- AQUÍ VAN LOS IDS
+        ];
     }
 }
