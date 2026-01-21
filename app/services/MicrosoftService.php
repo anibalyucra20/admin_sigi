@@ -160,6 +160,7 @@ class MicrosoftService
                     return ['success' => false, 'details' => isset($data['error']) ? $data['error']['message'] : 'Error create'];
                 }
             }
+            $license = $this->assignLicenseMicrosoft($data['id'], $skuId, $id_ies);
         } else {
             return ['success' => false, 'details' => $token['msg']];
         }
