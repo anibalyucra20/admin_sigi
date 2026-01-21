@@ -140,7 +140,7 @@ class MicrosoftService
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $data = json_decode($raw_response, true);
-            sleep(1);
+            sleep(4);
             // LOGICA DE RESPUESTA
             if ($method == "PATCH") {
                 if ($http_code == 204 || $http_code == 200) {
