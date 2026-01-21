@@ -140,7 +140,7 @@ class MicrosoftService
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $data = json_decode($raw_response, true);
-
+            sleep(1);
             // LOGICA DE RESPUESTA
             if ($method == "PATCH") {
                 if ($http_code == 204 || $http_code == 200) {
@@ -160,7 +160,6 @@ class MicrosoftService
                     return ['success' => false, 'details' => isset($data['error']) ? $data['error']['message'] : 'Error create'];
                 }
             }
-            $license = $this->assignLicenseMicrosoft($data['id'], $skuId, $id_ies);
         } else {
             return ['success' => false, 'details' => $token['msg']];
         }
@@ -398,7 +397,7 @@ class MicrosoftService
                 // --- PARTE C: Enviar Lote de LICENCIAS ---
                 if (count($requestsLicencias) > 0) {
                     $payloadLicencias = json_encode(["requests" => $requestsLicencias]);
-
+                    sleep(1);
                     $ch2 = curl_init($urlBatch);
                     curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
                     curl_setopt($ch2, CURLOPT_POST, true);
