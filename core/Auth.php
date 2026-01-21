@@ -26,7 +26,7 @@ class Auth
     public static function crearPassword(int $longitud = 8)
     {
         $parteAleatoria = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, $longitud);
-        $password = 'Sigi.' . $parteAleatoria . '!';
+        $password = 'Sigi.' . $parteAleatoria . '1';
         return $password;
     }
     public static function user(): ?array
