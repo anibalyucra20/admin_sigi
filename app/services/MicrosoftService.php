@@ -348,7 +348,7 @@ class MicrosoftService
                         // --- VINCULACIÓN CRÍTICA ---
                         // Usamos el reqId para obtener los datos originales del estudiante en este grupo
                         $datosOriginales = $grupo[$reqId];
-                        $idSigi = $datosOriginales['id_usuario']; // <--- TU ID DE SIGI
+                        $idSigi = $datosOriginales['id']; // <--- TU ID DE SIGI
 
                         // Recalculamos la licencia correcta para ESTE usuario específico
                         // (Corrección del bug de licencias mezcladas)
