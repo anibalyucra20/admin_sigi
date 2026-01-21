@@ -383,7 +383,8 @@ class MicrosoftService
                             $correosearch = $datosOriginales['dni'] . $sufijoCorreo;
                             //se podria realizar llamar a la funcion syncUserMicrosoft para sincronizar el usuario
                             //$user = $this->searchUserMicrosoft($correosearch, $id_ies);
-                            $user = $this->syncUserMicrosoft($id_ies, $idSigi, $datosOriginales['dni'], $correosearch, $datosOriginales['nombres'], $datosOriginales['apellidos'], $datosOriginales['passwordPlano'], $datosOriginales['programa_estudios'], $datosOriginales['tipo_usuario'], $datosOriginales['estado'], $skuIdDocente, $skuIdEstudiante);
+                            $estado_user = $datosOriginales['estado'] == 1 ? true : false;
+                            $user = $this->syncUserMicrosoft($id_ies, $idSigi, $datosOriginales['dni'], $correosearch, $datosOriginales['nombres'], $datosOriginales['apellidos'], $datosOriginales['passwordPlano'], $datosOriginales['programa_estudios'], $datosOriginales['tipo_usuario'], $estado_user, $skuIdDocente, $skuIdEstudiante);
                             if ($user['success'] == true) {
                                 $informeFinal[] = [
                                     'status' => true,
