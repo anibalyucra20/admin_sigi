@@ -166,10 +166,10 @@ class MoodleService
             // CAPTURA DE IDS (PLAN A):
             // Moodle devuelve un array: [['id' => 101, 'username' => '7019...'], ...]
             if (is_array($response)) {
-                foreach ($response as $moodleUser) {
+                foreach ($response as $key => $moodleUser) {
                     if (isset($moodleUser['id'])) {
                         $usuarios_vinculados[] = [
-                            'id_sigi'       => $moodleUser['idnumber'], // Usamos DNI como clave de búsqueda
+                            'id_sigi'   => $usuarios[$key]['id'], // Usamos DNI como clave de búsqueda
                             'moodle_id' => $moodleUser['id']
                         ];
                     }
