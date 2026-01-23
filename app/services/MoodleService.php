@@ -274,42 +274,52 @@ class MoodleService
      */
     public function createCourse($data, $MOODLE_URL, $MOODLE_TOKEN)
     {
-        // 1. Buscar si existe por IDNumber (Link sagrado con SIGI)
         $courses = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
             'value' => (string)$data['idnumber']
-
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         $coursePayload = [
-            'fullname'    => $data['fullname'],
-            'shortname'   => $data['shortname'],
-            'categoryid'  => $data['categoryId'],
-            'idnumber'    => (string)$data['idnumber'],
-            'summary'     => $data['summary'] ?? '',
-            'format'      => 'topics',
+            'fullname'   => $data['fullname'],
+            'shortname'  => $data['shortname'],
+            'categoryid' => (int)$data['categoryId'], // OK en tu diseño
+            'idnumber'   => (string)$data['idnumber'],
+            'summary'    => $data['summary'] ?? '',
+            'format'     => 'topics',
             'numsections' => 4,
-            'visible'     => 1
+            'visible'    => 1
         ];
 
         // CASO A: ACTUALIZAR
         if (!empty($courses) && isset($courses['courses'][0]['id'])) {
-            $moodleCourseId = $courses['courses'][0]['id'];
+            $moodleCourseId = (int)$courses['courses'][0]['id'];
             $coursePayload['id'] = $moodleCourseId;
-            // Actualizamos ubicación y nombres
+
             $respUp = $this->call('core_course_update_courses', ['courses' => [$coursePayload]], $MOODLE_URL, $MOODLE_TOKEN);
-            if (isset($respUp[0]['id'])) {
-                return $respUp[0]['id'];
+
+            // Solo es error si Moodle devuelve exception/errorcode
+            if (is_array($respUp) && (isset($respUp['exception']) || isset($respUp['errorcode']))) {
+                throw new \Exception("Error Moodle Update Course: " . json_encode($respUp));
             }
-            throw new \Exception("Error Moodle Update Course: " . json_encode($respUp));
+
+            // Si quieres, registra warnings como “nota”, no como error
+            // if (!empty($respUp['warnings'])) { ... }
+
+            return $moodleCourseId;
         }
 
         // CASO B: CREAR
         $resp = $this->call('core_course_create_courses', ['courses' => [$coursePayload]], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($resp[0]['id'])) {
-            return $resp[0]['id'];
+            return (int)$resp[0]['id'];
         }
-        throw new \Exception("Error Moodle Create Course: " . json_encode($resp));
+
+        // Si Moodle devuelve un objeto de error
+        if (is_array($resp) && (isset($resp['exception']) || isset($resp['errorcode']))) {
+            throw new \Exception("Error Moodle Create Course: " . json_encode($resp));
+        }
+
+        return false;
     }
 }
