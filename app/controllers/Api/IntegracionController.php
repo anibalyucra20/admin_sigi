@@ -193,7 +193,7 @@ class IntegracionController extends BaseApiController
         $ies = $this->objIes->find($this->tenantId);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
-
+        unset($cacheCats);
         $cacheCats = []; // Caché local para esta ejecución
         $errores = [];
         $cursosCreados = 0;
@@ -358,7 +358,7 @@ class IntegracionController extends BaseApiController
             }
         }
 
-        unset($cacheCats);
+
 
         $responseApi['success'] = ($cursosCreados > 0);
         $responseApi['message'] = ($cursosCreados > 0) ? $cursosCreados . ' Cursos creados exitosamente' : 'No se crearon cursos';
