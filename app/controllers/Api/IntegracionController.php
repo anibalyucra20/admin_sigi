@@ -314,6 +314,7 @@ class IntegracionController extends BaseApiController
                 $errores[] = "Excepción en ID Prog {$row['id_programacion']}: " . $e->getMessage();
             }
         }
+        unset($cacheCats);
         if ($cursosCreados > 0) {
             $responseApi['success'] = true;
             $responseApi['message'] = $cursosCreados . ' Cursos creados exitosamente';
