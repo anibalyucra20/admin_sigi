@@ -338,18 +338,33 @@ class IntegracionController extends BaseApiController
                 $codProg = !empty($row['codigo_programa']) ? $row['codigo_programa'] : 'PR' . $row['id_programa'];
                 $shortname = $codProg . '-UD' . $row['id_ud'] . '-' . $row['seccion'] . '-' . $row['turno'];
                 $fullname = $row['nombre_ud'] . ' - ' . $row['seccion'] . ' ' . $row['turno'];
-
+                $indicadores = $row['indicadores'];
+                $numSecciones = max(1, count($indicadores));
                 $moodleCourseId = $this->serviceMoodle->createCourse([
                     'fullname'   => $fullname,
                     'shortname'  => $shortname,
                     'categoryId' => $idCat_Seccion, // <-- Usamos la variable de Sección
                     'idnumber'   => $idnumber_Curso,
-                    'summary'    => "Unidad Didáctica: {$row['nombre_ud']}."
+                    'summary'    => "Unidad Didáctica: {$row['nombre_ud']}.",
+                    'numsections' => $numSecciones,
                 ], $MOODLE_URL, $MOODLE_TOKEN);
 
                 if ($moodleCourseId) {
-                    $cursosCreados++;
-                    $listaCursos[$row['id_programacion']] = $moodleCourseId;
+                    // Renombrar secciones en Moodle (1..N; sección 0 es “General”)
+                    $sectionNames = [];
+                    $i = 1;
+                    foreach ($indicadores as $ind) {
+                        $titulo = 'INDICADOR ' . $ind['codigo_capacidad'] . '.' . $ind['codigo'];
+                        $sectionNames[] = ['section' => $i, 'name' => $titulo, 'summary' => $ind['descripcion']];
+                        $i++;
+                    }
+                    $sectionNamesResult = $this->serviceMoodle->setSectionNames($moodleCourseId, $sectionNames, $MOODLE_URL, $MOODLE_TOKEN);
+                    if ($sectionNamesResult) {
+                        $cursosCreados++;
+                        $listaCursos[$row['id_programacion']] = $moodleCourseId;
+                    } else {
+                        $errores[] = "Error renombrando secciones del curso: $shortname";
+                    }
                 } else {
                     $errores[] = "Error creando curso: $shortname";
                 }

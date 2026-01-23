@@ -286,9 +286,12 @@ class MoodleService
             'idnumber'   => (string)$data['idnumber'],
             'summary'    => $data['summary'] ?? '',
             'format'     => 'topics',
-            'numsections' => 4,
-            'visible'    => 1
+            'visible'    => 1,
+            'courseformatoptions' => [
+                ['name' => 'numsections', 'value' => (int)($data['numsections'] ?? 4)]
+            ],
         ];
+
 
         // CASO A: ACTUALIZAR
         if (!empty($courses) && isset($courses['courses'][0]['id'])) {
@@ -321,5 +324,13 @@ class MoodleService
         }
 
         return false;
+    }
+
+    public function setSectionNames($courseId, array $sections, $MOODLE_URL, $MOODLE_TOKEN)
+    {
+        return $this->call('local_sigiws_update_sections', [
+            'courseid' => (int)$courseId,
+            'sections' => $sections
+        ], $MOODLE_URL, $MOODLE_TOKEN);
     }
 }
