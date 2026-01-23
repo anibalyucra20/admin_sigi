@@ -230,9 +230,6 @@ class MoodleService
 
 
     // ======================== Crea o busca una categoría en Moodle ========================
-    /**
-     * Busca o crea una categoría. Si existe pero está mal ubicada, la mueve al padre correcto.
-     */
     public function getOrCreateCategory($nombre, $idnumber, $parentId = 0, $MOODLE_URL, $MOODLE_TOKEN)
     {
         // 1. Buscar si ya existe por idnumber
@@ -241,21 +238,8 @@ class MoodleService
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (!empty($cat) && isset($cat[0]['id'])) {
-            $existingCat = $cat[0];
-
-            // === AUTO-REPARACIÓN ===
-            // Si la categoría existe, pero su padre es diferente al que debería ser...
-            if ($existingCat['parent'] != $parentId) {
-                // ¡La movemos al lugar correcto!
-                $this->call('core_course_update_categories', ['categories' => [[
-                    'id' => $existingCat['id'],
-                    'parent' => $parentId
-                ]]], $MOODLE_URL, $MOODLE_TOKEN);
-            }
-
-            return $existingCat['id'];
+            return $cat[0]['id'];
         }
-
         // 2. Si no existe, crearla
         $newCat = [
             'name' => $nombre,
@@ -263,14 +247,12 @@ class MoodleService
             'idnumber' => (string)$idnumber,
             'descriptionformat' => 1
         ];
-
         $resp = $this->call('core_course_create_categories', ['categories' => [$newCat]], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($resp[0]['id'])) {
             return $resp[0]['id'];
         }
-
-        throw new \Exception("No se pudo crear la categoría '$nombre'. Error: " . json_encode($resp));
+        throw new \Exception("No se pudo crear la categoría '$nombre'. Error Moodle: " . json_encode($resp));
     }
 
 
