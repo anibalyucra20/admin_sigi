@@ -319,10 +319,12 @@ class IntegracionController extends BaseApiController
             $responseApi['success'] = true;
             $responseApi['message'] = $cursosCreados . ' Cursos creados exitosamente';
             $responseApi['cursosCreados'] = $cursosCreados;
+            $responseApi['listaCursos'] = $listaCursos;
             $responseApi['errores'] = $errores;
         } else {
             $responseApi['success'] = false;
             $responseApi['message'] = ' No se crearon cursos';
+            $responseApi['listaCursos'] = $listaCursos;
             $responseApi['errores'] = $errores;
         }
 
