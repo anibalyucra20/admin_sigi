@@ -263,7 +263,7 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 7: TURNO
                 // ======================================================
-                $turNombre = 'TURNO ' . $turnoMap[$row['turno']] ?? 'TURNO ' . $row['turno'];
+                $turNombre = 'TURNO ' . ($turnoMap[$row['turno']] ?? $row['turno']);
                 $idNum_Tur = $idNum_Sem . '_T_' . $row['turno'];
 
                 if (!isset($cacheCats[$idNum_Tur])) {
