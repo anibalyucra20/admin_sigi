@@ -202,6 +202,7 @@ class IntegracionController extends BaseApiController
 
         foreach ($programacion as $row) {
             try {
+                $parentId = 0;
                 // ======================================================
                 // NIVEL 1: PERIODO
                 // ======================================================
