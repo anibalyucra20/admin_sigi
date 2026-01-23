@@ -241,12 +241,12 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 5: MÓDULO FORMATIVO
                 // ======================================================
-                $modNombre = 'MÓDULO FORMATIVO ' . $row['nro_modulo'];
+                //$modNombre = 'MÓDULO FORMATIVO ' . $row['nro_modulo'];
                 $idNum_Mod = $idNum_Plan . '_MF_' . $row['id_modulo'];
                 if (!isset($cacheCats[$idNum_Mod])) {
                     // Recortamos nombre por si es muy largo
                     $nomMod = mb_strimwidth($row['nombre_modulo'], 0, 100, "...");
-                    $cacheCats[$idNum_Mod] = $this->serviceMoodle->getOrCreateCategory($modNombre, $idNum_Mod, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
+                    $cacheCats[$idNum_Mod] = $this->serviceMoodle->getOrCreateCategory($nomMod, $idNum_Mod, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
                 $parentId = $cacheCats[$idNum_Mod];
 
