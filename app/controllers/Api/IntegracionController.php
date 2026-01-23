@@ -205,7 +205,7 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 1: PERIODO
                 // ======================================================
-                $idNum_Per = 'PERIODO_' . $row['id_periodo'];
+                $idNum_Per = 'P_' . $row['id_periodo'];
                 if (!isset($cacheCats[$idNum_Per])) {
                     $cacheCats[$idNum_Per] = $this->serviceMoodle->getOrCreateCategory('PERIODO ' . $row['nombre_periodo'], $idNum_Per, 0, $MOODLE_URL, $MOODLE_TOKEN);
                 }
@@ -214,7 +214,7 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 2: SEDE
                 // ======================================================
-                $idNum_Sede = $idNum_Per . '_SEDE_' . $row['id_sede'];
+                $idNum_Sede = $idNum_Per . '_S_' . $row['id_sede'];
                 if (!isset($cacheCats[$idNum_Sede])) {
                     $cacheCats[$idNum_Sede] = $this->serviceMoodle->getOrCreateCategory('SEDE ' . $row['nombre_sede'], $idNum_Sede, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
@@ -223,7 +223,7 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 3: PROGRAMA DE ESTUDIOS
                 // ======================================================
-                $idNum_Prog = $idNum_Sede . '_PE_' . $row['id_programa'];
+                $idNum_Prog = $idNum_Sede . '_PR_' . $row['id_programa'];
                 if (!isset($cacheCats[$idNum_Prog])) {
                     $cacheCats[$idNum_Prog] = $this->serviceMoodle->getOrCreateCategory($row['nombre_programa'], $idNum_Prog, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
@@ -232,7 +232,7 @@ class IntegracionController extends BaseApiController
                 // ======================================================
                 // NIVEL 4: PLAN DE ESTUDIOS
                 // ======================================================
-                $idNum_Plan = $idNum_Prog . '_PLAN_' . $row['id_plan'];
+                $idNum_Plan = $idNum_Prog . '_PL_' . $row['id_plan'];
                 if (!isset($cacheCats[$idNum_Plan])) {
                     $cacheCats[$idNum_Plan] = $this->serviceMoodle->getOrCreateCategory('Plan ' . $row['nombre_plan'], $idNum_Plan, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
@@ -254,7 +254,7 @@ class IntegracionController extends BaseApiController
                 // NIVEL 6: SEMESTRE
                 // ======================================================
                 $semNombre = 'SEMESTRE ' . $row['nombre_semestre'];
-                $idNum_Sem = $idNum_Mod . '_SEMESTRE_' . $row['id_semestre'];
+                $idNum_Sem = $idNum_Mod . '_SEM_' . $row['id_semestre'];
                 if (!isset($cacheCats[$idNum_Sem])) {
                     $cacheCats[$idNum_Sem] = $this->serviceMoodle->getOrCreateCategory($semNombre, $idNum_Sem, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
@@ -264,7 +264,7 @@ class IntegracionController extends BaseApiController
                 // NIVEL 7: TURNO
                 // ======================================================
                 $turNombre = 'TURNO ' . $turnoMap[$row['turno']] ?? 'TURNO ' . $row['turno'];
-                $idNum_Tur = $idNum_Sem . '_TURNO_' . $row['turno'];
+                $idNum_Tur = $idNum_Sem . '_T_' . $row['turno'];
 
                 if (!isset($cacheCats[$idNum_Tur])) {
                     $cacheCats[$idNum_Tur] = $this->serviceMoodle->getOrCreateCategory($turNombre, $idNum_Tur, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
@@ -275,7 +275,7 @@ class IntegracionController extends BaseApiController
                 // NIVEL 8: SECCIÓN
                 // ======================================================
                 $secNombre = 'SECCIÓN ' . $row['seccion'];
-                $idNum_Sec = $idNum_Tur . '_SECCIÓN_' . $row['seccion'];
+                $idNum_Sec = $idNum_Tur . '_SEC_' . $row['seccion'];
                 if (!isset($cacheCats[$idNum_Sec])) {
                     $cacheCats[$idNum_Sec] = $this->serviceMoodle->getOrCreateCategory($secNombre, $idNum_Sec, $parentId, $MOODLE_URL, $MOODLE_TOKEN);
                 }
