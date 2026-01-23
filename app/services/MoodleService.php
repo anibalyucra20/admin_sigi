@@ -232,28 +232,40 @@ class MoodleService
     // ======================== Crea o busca una categoría en Moodle ========================
     public function getOrCreateCategory($nombre, $idnumber, $parentId = 0, $MOODLE_URL, $MOODLE_TOKEN)
     {
-        // 1. Buscar si ya existe por idnumber
+        // 1) Buscar solo la categoría exacta (sin subcategorías)
         $cat = $this->call('core_course_get_categories', [
-            'criteria' => [['key' => 'idnumber', 'value' => (string)$idnumber]]
+            'criteria' => [
+                ['key' => 'idnumber', 'value' => (string)$idnumber]
+            ],
+            'addsubcategories' => 0
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (!empty($cat) && isset($cat[0]['id'])) {
-            return $cat[0]['id'];
+        // 2) Validar exactitud por seguridad
+        if (!empty($cat)) {
+            foreach ($cat as $c) {
+                if (($c['idnumber'] ?? '') === (string)$idnumber) {
+                    return (int)$c['id'];
+                }
+            }
         }
-        // 2. Si no existe, crearla
+
+        // 3) Crear si no existe
         $newCat = [
             'name' => $nombre,
-            'parent' => $parentId,
+            'parent' => (int)$parentId,
             'idnumber' => (string)$idnumber,
             'descriptionformat' => 1
         ];
+
         $resp = $this->call('core_course_create_categories', ['categories' => [$newCat]], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($resp[0]['id'])) {
-            return $resp[0]['id'];
+            return (int)$resp[0]['id'];
         }
+
         throw new \Exception("No se pudo crear la categoría '$nombre'. Error Moodle: " . json_encode($resp));
     }
+
 
 
     /**
@@ -285,8 +297,11 @@ class MoodleService
             $moodleCourseId = $courses['courses'][0]['id'];
             $coursePayload['id'] = $moodleCourseId;
             // Actualizamos ubicación y nombres
-            $this->call('core_course_update_courses', ['courses' => [$coursePayload]], $MOODLE_URL, $MOODLE_TOKEN);
-            return $moodleCourseId;
+            $respUp = $this->call('core_course_update_courses', ['courses' => [$coursePayload]], $MOODLE_URL, $MOODLE_TOKEN);
+            if (isset($respUp[0]['id'])) {
+                return $respUp[0]['id'];
+            }
+            throw new \Exception("Error Moodle Update Course: " . json_encode($respUp));
         }
 
         // CASO B: CREAR
@@ -295,8 +310,6 @@ class MoodleService
         if (isset($resp[0]['id'])) {
             return $resp[0]['id'];
         }
-        // Si falla, retornamos false o lanzamos excepción según prefieras
-        // throw new \Exception("Error Moodle Create Course: " . json_encode($resp));
-        return false;
+        throw new \Exception("Error Moodle Create Course: " . json_encode($resp));
     }
 }
