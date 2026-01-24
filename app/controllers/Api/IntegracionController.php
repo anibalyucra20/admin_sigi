@@ -354,8 +354,16 @@ class IntegracionController extends BaseApiController
                     $sectionNames = [];
                     $i = 1;
                     foreach ($indicadores as $ind) {
-                        $titulo = 'INDICADOR ' . $ind['codigo_capacidad'] . '.' . $ind['codigo'];
-                        $sectionNames[] = ['section' => $i, 'name' => $titulo, 'summary' => $ind['descripcion']];
+                        $titulo = 'Indicador de logro ' . $ind['codigo_capacidad'] . '.' . $ind['codigo'];
+                        $summary = '
+                        <div class="sigi-indicador">
+                        <p><strong>Indicador de logro</strong></p>
+                        <ul>
+                            <li><strong>Código:</strong> ' . htmlspecialchars($ind['codigo_capacidad'] . '.' . $ind['codigo'], ENT_QUOTES, 'UTF-8') . '</li>
+                            <li><strong>Descripción:</strong> ' . htmlspecialchars($ind['descripcion'], ENT_QUOTES, 'UTF-8') . '</li>
+                        </ul>
+                        </div>';
+                        $sectionNames[] = ['section' => $i, 'name' => $titulo, 'summary' => $summary, 'summaryformat' => 1];
                         $i++;
                     }
                     $sectionNamesResult = $this->serviceMoodle->setSectionNames($moodleCourseId, $sectionNames, $MOODLE_URL, $MOODLE_TOKEN);
