@@ -354,10 +354,9 @@ class IntegracionController extends BaseApiController
                     $sectionNames = [];
                     $i = 1;
                     foreach ($indicadores as $ind) {
-                        $titulo = 'Indicador de logro ' . $ind['codigo_capacidad'] . '.' . $ind['codigo'];
+                        $titulo = 'Indicador de logro ' . $i;
                         $summary = '
                         <div class="sigi-indicador">
-                        <p><strong>Indicador de logro</strong></p>
                         <ul>
                             <li><strong>Código:</strong> ' . htmlspecialchars($ind['codigo_capacidad'] . '.' . $ind['codigo'], ENT_QUOTES, 'UTF-8') . '</li>
                             <li><strong>Descripción:</strong> ' . htmlspecialchars($ind['descripcion'], ENT_QUOTES, 'UTF-8') . '</li>
