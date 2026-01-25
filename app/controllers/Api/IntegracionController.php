@@ -388,9 +388,11 @@ class IntegracionController extends BaseApiController
                         $matriculaDocente = $this->serviceMoodle->enrolUserToCourse($moodleCourseId, $docente['id'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
                         if ($matriculaDocente) {
                             $docenteMatriculados++;
-                            $desmatriculaDocente = $this->serviceMoodle->unenrolUserFromCourse($moodleCourseId, $row['id_moodle_docente_anterior'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
-                            if (!$desmatriculaDocente) {
-                                $errores[] = "Error desmatriculando docente anterior: " . $row['id_moodle_docente_anterior'];
+                            if ($row['id_moodle_docente_anterior']) {
+                                $desmatriculaDocente = $this->serviceMoodle->unenrolUserFromCourse($moodleCourseId, $row['id_moodle_docente_anterior'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
+                                if (!$desmatriculaDocente) {
+                                    $errores[] = "Error desmatriculando docente anterior: " . $row['id_moodle_docente_anterior'];
+                                }
                             }
                         } else {
                             $errores[] = "Error matriculando docente: $nombres $apellidos";
