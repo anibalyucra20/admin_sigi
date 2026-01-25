@@ -12,6 +12,18 @@ class MoodleService
     {
         $this->objConsulta = new ConsultaModel();
     }
+
+    public function findUserById($MOODLE_URL, $MOODLE_TOKEN, $sigiId)
+    {
+        $moodleUser = $this->call('core_user_get_users_by_field', [
+            'field' => 'idnumber',
+            'values' => [(string)$sigiId]
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+        if (empty($moodleUser) || isset($moodleUser['exception'])) {
+            return false;
+        }
+        return $moodleUser[0]['id'];
+    }
     /**
      * Sincroniza (Crea o Actualiza) un usuario de SIGI hacia Moodle.
      * Utiliza el ID de SIGI como 'idnumber' en Moodle para mantener el vínculo.
@@ -23,10 +35,7 @@ class MoodleService
         // 1. Buscamos en Moodle por tu ID de SIGI (campo 'idnumber')
         // Esto es mucho más seguro que buscar por DNI
         $respuesta = [];
-        $moodleUser = $this->call('core_user_get_users_by_field', [
-            'field' => 'idnumber',
-            'values' => [(string)$sigiId]
-        ], $MOODLE_URL, $MOODLE_TOKEN);
+        $moodleUser = $this->findUserById($MOODLE_URL, $MOODLE_TOKEN, $sigiId);
 
         $userPayload = [
             'username'      => $dni,
@@ -45,8 +54,8 @@ class MoodleService
         }
 
         // CASO A: ACTUALIZAR (Si ya existe)
-        if (!empty($moodleUser) && !isset($moodleUser['exception'])) {
-            $moodleInternalId = $moodleUser[0]['id'];
+        if ($moodleUser) {
+            $moodleInternalId = $moodleUser;
 
             // Para actualizar, Moodle exige el ID interno
             $userPayload['id'] = $moodleInternalId;
