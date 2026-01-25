@@ -418,5 +418,28 @@ class IntegracionController extends BaseApiController
         $this->json($responseApi);
         exit;
     }
+
+
+
+    public function deleteProgramacionUd()
+    {
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+
+        $id_programacion = 'PROG_' . $data['id_programacion'];
+        $this->requireApiKey($this->endpointSyncCourseMoodle);
+
+        $ies = $this->objIes->find($this->tenantId);
+        $MOODLE_URL = $ies['MOODLE_URL'];
+        $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+        $resp = $this->serviceMoodle->deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN);
+
+        $this->json([
+            'success' => $resp,
+            'message' => $resp ? 'Curso eliminado exitosamente' : 'Error eliminando curso',
+        ]);
+        exit;
+    }
     //=============================== FIN INTEGRACIONES ===============================
 }
