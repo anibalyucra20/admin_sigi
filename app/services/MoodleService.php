@@ -341,4 +341,29 @@ class MoodleService
         }
         return true;
     }
+
+    // ======================== desmatricular usuario ===========================
+    public function unenrolUserFromCourse(int $courseId, int $userId, ?int $roleId, string $MOODLE_URL, string $MOODLE_TOKEN): bool
+    {
+        $enrolment = [
+            'userid'   => (int)$userId,
+            'courseid' => (int)$courseId,
+        ];
+
+        // roleid es opcional (y puede ser ignorado por Moodle), pero lo soportamos
+        if (!empty($roleId)) {
+            $enrolment['roleid'] = (int)$roleId;
+        }
+
+        $resp = $this->call('enrol_manual_unenrol_users', [
+            'enrolments' => [$enrolment]
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+
+        // Si Moodle responde con error estructurado
+        if (is_array($resp) && (isset($resp['exception']) || isset($resp['errorcode']))) {
+            return false;
+        }
+
+        return true;
+    }
 }

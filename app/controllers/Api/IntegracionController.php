@@ -375,20 +375,22 @@ class IntegracionController extends BaseApiController
                         $errores[] = "Error renombrando secciones del curso: $shortname";
                     }
                     // matricular docente
-                    $id_ies = '';
-                    $sigiId = $row['id_docente'];
-                    $dni = $row['dni_docente'];
-                    $email = $row['dni_docente'] . $SUFIJO_EMAIL;
-                    $nombres = $row['nombre_docente'];
-                    $apellidos = $row['apellidos_docente'];
-                    $passwordPlano = null;
-                    $rol_docente = 3;
-                    $docente = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
-                    $matriculaDocente = $this->serviceMoodle->enrolUserToCourse($moodleCourseId, $docente['id'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
-                    if ($matriculaDocente) {
-                        $docenteMatriculados++;
-                    } else {
-                        $errores[] = "Error matriculando docente: $nombres $apellidos";
+                    if ($row['docente_distinto']) {
+                        $id_ies = '';
+                        $sigiId = $row['id_docente'];
+                        $dni = $row['dni_docente'];
+                        $email = $row['dni_docente'] . $SUFIJO_EMAIL;
+                        $nombres = $row['nombre_docente'];
+                        $apellidos = $row['apellidos_docente'];
+                        $passwordPlano = null;
+                        $rol_docente = 3;
+                        $docente = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
+                        $matriculaDocente = $this->serviceMoodle->enrolUserToCourse($moodleCourseId, $docente['id'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
+                        if ($matriculaDocente) {
+                            $docenteMatriculados++;
+                        } else {
+                            $errores[] = "Error matriculando docente: $nombres $apellidos";
+                        }
                     }
                 } else {
                     $errores[] = "Error creando curso: $shortname";
@@ -403,8 +405,8 @@ class IntegracionController extends BaseApiController
         $responseApi['success'] = ($cursosCreados > 0);
         $responseApi['message'] = ($cursosCreados > 0) ? $cursosCreados . ' Cursos creados exitosamente' : 'No se crearon cursos';
         $responseApi['cursosCreados'] = $cursosCreados;
-        $responseApi['listaCursos'] = $listaCursos;
         $responseApi['docentesMatriculados'] = $docenteMatriculados;
+        $responseApi['listaCursos'] = $listaCursos;
         $responseApi['errores'] = $errores;
 
         $this->json($responseApi);
