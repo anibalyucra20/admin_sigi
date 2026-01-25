@@ -30,10 +30,10 @@ class MoodleService
 
         $userPayload = [
             'username'      => $dni,
-            'firstname'     => $nombres,
-            'lastname'      => $apellidos,
+            'firstname'     => $nombres ?? '-',
+            'lastname'      => $apellidos ?? '-',
             'email'         => $email,
-            'idnumber'      => (string)$sigiId, // <--- AQUÍ ESTÁ TU VÍNCULO SAGRADO
+            'idnumber'      => (string)$sigiId ?? '0', // <--- AQUÍ ESTÁ TU VÍNCULO SAGRADO
             'auth'          => 'manual',
         ];
 
@@ -73,16 +73,6 @@ class MoodleService
         $respuesta['message_error'] .= '<br>Usuario no creado en Moodle.';
         $respuesta['id'] = false;
         return $respuesta;
-    }
-
-    public function enroll($MOODLE_URL, $MOODLE_TOKEN, $userId, $courseId, $roleId)
-    {
-        $resp = $this->call('enrol_manual_enrol_users', ['enrolments' => [[
-            'roleid' => $roleId,
-            'userid' => $userId,
-            'courseid' => $courseId
-        ]]], $MOODLE_URL, $MOODLE_TOKEN);
-        return empty($resp);
     }
 
     /* Utilitario cURL Privado */
@@ -193,12 +183,12 @@ class MoodleService
         $erroresMoodle = [];
 
         foreach ($usuarios as $singleUser) {
-            $sigiId = $singleUser['idnumber'];
-            $dni = $singleUser['username'];
-            $email = $singleUser['email'];
-            $nombres = $singleUser['firstname'];
-            $apellidos = $singleUser['lastname'];
-            $passwordPlano = $singleUser['password'];
+            $sigiId = $singleUser['idnumber'] ?? '0';
+            $dni = $singleUser['username'] ?? '-';
+            $email = $singleUser['email'] ?? '-';
+            $nombres = $singleUser['firstname'] ?? '-';
+            $apellidos = $singleUser['lastname'] ?? '-';
+            $passwordPlano = $singleUser['password'] ?? '-';
 
             // Tu llamada syncUser intacta
             $indivResp = $this->syncUser($MOODLE_URL, $MOODLE_TOKEN, '', $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
@@ -280,11 +270,11 @@ class MoodleService
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         $coursePayload = [
-            'fullname'   => $data['fullname'],
-            'shortname'  => $data['shortname'],
+            'fullname'   => $data['fullname'] ?? '-',
+            'shortname'  => $data['shortname'] ?? '-',
             'categoryid' => (int)$data['categoryId'], // OK en tu diseño
             'idnumber'   => (string)$data['idnumber'],
-            'summary'    => $data['summary'] ?? '',
+            'summary'    => $data['summary'] ?? '-',
             'format'     => 'topics',
             'visible'    => 1,
             'courseformatoptions' => [
@@ -332,5 +322,23 @@ class MoodleService
             'courseid' => (int)$courseId,
             'sections' => $sections
         ], $MOODLE_URL, $MOODLE_TOKEN);
+    }
+
+    //======================== matricular usuario =======================
+    public function enrolUserToCourse(int $courseId, int $userId, int $roleId, string $MOODLE_URL, string $MOODLE_TOKEN): bool
+    {
+        $resp = $this->call('enrol_manual_enrol_users', [
+            'enrolments' => [[
+                'roleid'   => $roleId,
+                'userid'   => $userId,
+                'courseid' => $courseId,
+            ]]
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+
+        // Normalmente no retorna nada “útil” si todo OK (o warnings)
+        if (is_array($resp) && (isset($resp['exception']) || isset($resp['errorcode']))) {
+            return false;
+        }
+        return true;
     }
 }

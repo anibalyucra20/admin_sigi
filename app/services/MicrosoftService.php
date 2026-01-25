@@ -80,13 +80,13 @@ class MicrosoftService
 
             $userPayload = [
                 'accountEnabled' => $estado,
-                'displayName' => $nombres . ' ' . $apellidos,
+                'displayName' => ($nombres . ' ' . $apellidos) ?? '-',
                 'mailNickname' => $dni, // Usamos DNI como alias para evitar errores con puntos o espacios
                 'userPrincipalName' => $email,
-                'surname' => $apellidos,
-                'givenName' => $nombres,
-                'jobTitle' => $tipo_usuario,
-                'department' => $programa_estudios,
+                'surname' => $apellidos ?? '-',
+                'givenName' => $nombres ?? '-',
+                'jobTitle' => $tipo_usuario ?? '-',
+                'department' => $programa_estudios ?? '-',
                 'preferredLanguage' => 'es-ES',
                 'usageLocation' => 'PE', // OBLIGATORIO PARA LICENCIAS
             ];
@@ -302,13 +302,13 @@ class MicrosoftService
                         "headers" => ["Content-Type" => "application/json"],
                         "body" => [
                             "accountEnabled" => $estado,
-                            "displayName" => $estudiante['nombres'] . ' ' . $estudiante['apellidos'],
+                            "displayName" => ($estudiante['nombres'] . ' ' . $estudiante['apellidos']) ?? '-',
                             "mailNickname" => $estudiante['dni'],
                             "userPrincipalName" => $estudiante['dni'] . $sufijoCorreo,
-                            'surname' => $estudiante['apellidos'],
-                            'givenName' => $estudiante['nombres'],
-                            'jobTitle' => $estudiante['tipo_usuario'],
-                            'department' => $estudiante['programa_estudios'],
+                            'surname' => $estudiante['apellidos'] ?? '-',
+                            'givenName' => $estudiante['nombres'] ?? '-',
+                            'jobTitle' => $estudiante['tipo_usuario'] ?? '-',
+                            'department' => $estudiante['programa_estudios'] ?? '-',
                             'preferredLanguage' => 'es-ES',
                             "usageLocation" => "PE",
                             "passwordProfile" => [
