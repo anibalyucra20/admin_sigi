@@ -42,10 +42,9 @@ class IntegracionController extends BaseApiController
     //=============================== INICIO INTEGRACIONES ===============================
     public function syncUserIntegraciones()
     {
+        $this->requireApiKey($this->endpointSynUserIntegraciones);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
-        // 1. Seguridad: Valida X-Api-Key, Suscripción y obtiene Tenant ID
-        $this->requireApiKey($this->endpointSynUserIntegraciones);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $MICROSOFT_SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
@@ -425,12 +424,13 @@ class IntegracionController extends BaseApiController
 
     public function deleteProgramacionUd()
     {
+        $this->requireApiKey($this->endpointSyncCourseMoodle);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
         $id_programacion = 'PROG_' . $data['id_programacion'];
-        $this->requireApiKey($this->endpointSyncCourseMoodle);
+
         if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
             $MOODLE_URL = $ies['MOODLE_URL'];
             $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
@@ -449,11 +449,11 @@ class IntegracionController extends BaseApiController
 
     public function sincronizarMatriculaEstudiante()
     {
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
 
         $datos = $data['data'];
-        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
@@ -498,11 +498,11 @@ class IntegracionController extends BaseApiController
     //===================== agregar matriculas =====================================
     public function addMatriculas()
     {
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
         $datos = $data['data'];
         $roleId = $data['roleMoodle'] ?? 5;
-        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
@@ -526,10 +526,10 @@ class IntegracionController extends BaseApiController
     // ==================== eliminar matriculas ======================================
     public function deleteUserInCourse()
     {
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
         $datos = $data['data'];
-        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
