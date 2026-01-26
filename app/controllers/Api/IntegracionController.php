@@ -465,7 +465,7 @@ class IntegracionController extends BaseApiController
             }
             //datos de estudiante
             $id_user_moodle = $this->serviceMoodle->findUserById($MOODLE_URL, $MOODLE_TOKEN, $datos['id_estudiante']);
-            if (!$id_user_moodle) {
+            if ($id_user_moodle != false) {
                 $usersPayload[] = [
                     'username'      => $datos['dni'],
                     'password'      => $datos['password'], // La clave plana "Sigi..." que enviaste
@@ -478,7 +478,8 @@ class IntegracionController extends BaseApiController
                         ['type'  => 'auth_forcepasswordchange', 'value' => 0]
                     ]
                 ];
-                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $datos['id_estudiante'], $datos['dni'], ($datos['id_estudiante'] . $SUFIJO_EMAIL), $datos['Nombres'], $datos['Apellidos'],  $datos['password']);
+                $correo = $datos['dni'] . $SUFIJO_EMAIL;
+                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $datos['id_estudiante'], $datos['dni'], $correo, $datos['Nombres'], $datos['Apellidos'],  $datos['password']);
                 if ($resp['id']) {
                     $id_user_moodle = $resp['id'];
                 }
