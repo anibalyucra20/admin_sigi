@@ -338,7 +338,7 @@ class IntegracionController extends BaseApiController
                     // ======================================================
                     $idnumber_Curso = 'PROG_' . $row['id_programacion'];
                     $codProg = !empty($row['codigo_programa']) ? $row['codigo_programa'] : 'PR' . $row['id_programa'];
-                    $shortname = $codProg . '-UD' . $row['id_ud'] . '-' . $row['seccion'] . '-' . $row['turno'];
+                    $shortname = $row['nombre_periodo'] . '-' . $codProg . '-UD' . $row['id_ud'] . '-' . $row['seccion'] . '-' . $row['turno'];
                     $fullname = $row['nombre_ud'] . ' - ' . $row['seccion'] . ' ' . $row['turno'];
                     $indicadores = $row['indicadores'];
                     $numSecciones = max(1, count($indicadores));

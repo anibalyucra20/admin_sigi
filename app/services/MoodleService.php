@@ -281,7 +281,7 @@ class MoodleService
         $coursePayload = [
             'fullname'   => $data['fullname'] ?? '-',
             'shortname'  => $data['shortname'] ?? '-',
-            'categoryid' => (int)$data['categoryId'], // OK en tu diseño
+            'categoryid' => (int)$data['categoryId'],
             'idnumber'   => (string)$data['idnumber'],
             'summary'    => $data['summary'] ?? '-',
             'format'     => 'topics',
