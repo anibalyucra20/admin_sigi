@@ -424,9 +424,9 @@ class IntegracionController extends BaseApiController
 
     public function deleteProgramacionUd()
     {
+        $ies = $this->objIes->find($this->tenantId);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
-        $ies = $this->objIes->find($this->tenantId);
         $id_programacion = 'PROG_' . $data['id_programacion'];
         $this->requireApiKey($this->endpointSyncCourseMoodle);
         if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
