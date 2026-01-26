@@ -204,205 +204,206 @@ class IntegracionController extends BaseApiController
 
         // Mapeo de Turnos
         $turnoMap = ['M' => 'MAÑANA', 'T' => 'TARDE', 'N' => 'NOCHE'];
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            foreach ($programacion as $row) {
+                try {
+                    // ======================================================
+                    // NIVEL 1: PERIODO (Variable: $idCat_Periodo)
+                    // ======================================================
+                    $idNum_Per = 'P_' . $row['id_periodo'];
+                    if (!isset($cacheCats[$idNum_Per])) {
+                        $cacheCats[$idNum_Per] = $this->serviceMoodle->getOrCreateCategory(
+                            'PERIODO ' . $row['nombre_periodo'],
+                            $idNum_Per,
+                            0, // Padre: Raíz
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Periodo = $cacheCats[$idNum_Per]; // <-- Variable Única Nivel 1
 
-        foreach ($programacion as $row) {
-            try {
-                // ======================================================
-                // NIVEL 1: PERIODO (Variable: $idCat_Periodo)
-                // ======================================================
-                $idNum_Per = 'P_' . $row['id_periodo'];
-                if (!isset($cacheCats[$idNum_Per])) {
-                    $cacheCats[$idNum_Per] = $this->serviceMoodle->getOrCreateCategory(
-                        'PERIODO ' . $row['nombre_periodo'],
-                        $idNum_Per,
-                        0, // Padre: Raíz
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Periodo = $cacheCats[$idNum_Per]; // <-- Variable Única Nivel 1
+                    // ======================================================
+                    // NIVEL 2: SEDE (Padre: $idCat_Periodo)
+                    // ======================================================
+                    $idNum_Sede = $idNum_Per . '_S_' . $row['id_sede'];
+                    if (!isset($cacheCats[$idNum_Sede])) {
+                        $cacheCats[$idNum_Sede] = $this->serviceMoodle->getOrCreateCategory(
+                            'SEDE ' . $row['nombre_sede'],
+                            $idNum_Sede,
+                            $idCat_Periodo, // <-- Usamos explícitamente el ID del Periodo
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Sede = $cacheCats[$idNum_Sede]; // <-- Variable Única Nivel 2
 
-                // ======================================================
-                // NIVEL 2: SEDE (Padre: $idCat_Periodo)
-                // ======================================================
-                $idNum_Sede = $idNum_Per . '_S_' . $row['id_sede'];
-                if (!isset($cacheCats[$idNum_Sede])) {
-                    $cacheCats[$idNum_Sede] = $this->serviceMoodle->getOrCreateCategory(
-                        'SEDE ' . $row['nombre_sede'],
-                        $idNum_Sede,
-                        $idCat_Periodo, // <-- Usamos explícitamente el ID del Periodo
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Sede = $cacheCats[$idNum_Sede]; // <-- Variable Única Nivel 2
+                    // ======================================================
+                    // NIVEL 3: PROGRAMA (Padre: $idCat_Sede)
+                    // ======================================================
+                    $idNum_Prog = $idNum_Sede . '_PR_' . $row['id_programa'];
+                    if (!isset($cacheCats[$idNum_Prog])) {
+                        $cacheCats[$idNum_Prog] = $this->serviceMoodle->getOrCreateCategory(
+                            $row['nombre_programa'],
+                            $idNum_Prog,
+                            $idCat_Sede, // <-- Padre Sede
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Programa = $cacheCats[$idNum_Prog]; // <-- Variable Única Nivel 3
 
-                // ======================================================
-                // NIVEL 3: PROGRAMA (Padre: $idCat_Sede)
-                // ======================================================
-                $idNum_Prog = $idNum_Sede . '_PR_' . $row['id_programa'];
-                if (!isset($cacheCats[$idNum_Prog])) {
-                    $cacheCats[$idNum_Prog] = $this->serviceMoodle->getOrCreateCategory(
-                        $row['nombre_programa'],
-                        $idNum_Prog,
-                        $idCat_Sede, // <-- Padre Sede
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Programa = $cacheCats[$idNum_Prog]; // <-- Variable Única Nivel 3
+                    // ======================================================
+                    // NIVEL 4: PLAN DE ESTUDIOS (Padre: $idCat_Programa)
+                    // ======================================================
+                    $idNum_Plan = $idNum_Prog . '_PL_' . $row['id_plan'];
+                    if (!isset($cacheCats[$idNum_Plan])) {
+                        $cacheCats[$idNum_Plan] = $this->serviceMoodle->getOrCreateCategory(
+                            'Plan ' . $row['nombre_plan'],
+                            $idNum_Plan,
+                            $idCat_Programa, // <-- Padre Programa
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Plan = $cacheCats[$idNum_Plan]; // <-- Variable Única Nivel 4
 
-                // ======================================================
-                // NIVEL 4: PLAN DE ESTUDIOS (Padre: $idCat_Programa)
-                // ======================================================
-                $idNum_Plan = $idNum_Prog . '_PL_' . $row['id_plan'];
-                if (!isset($cacheCats[$idNum_Plan])) {
-                    $cacheCats[$idNum_Plan] = $this->serviceMoodle->getOrCreateCategory(
-                        'Plan ' . $row['nombre_plan'],
-                        $idNum_Plan,
-                        $idCat_Programa, // <-- Padre Programa
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Plan = $cacheCats[$idNum_Plan]; // <-- Variable Única Nivel 4
+                    // ======================================================
+                    // NIVEL 5: MÓDULO FORMATIVO (Padre: $idCat_Plan) - AQUÍ FALLABA
+                    // ======================================================
+                    // Al usar $idCat_Plan, aseguramos que el padre sea SIEMPRE el Plan,
+                    // y nunca el Módulo anterior.
+                    $idNum_Mod = $idNum_Plan . '_MF_' . $row['id_modulo'];
+                    if (!isset($cacheCats[$idNum_Mod])) {
+                        $nomMod = mb_strimwidth($row['nombre_modulo'], 0, 100, "...");
+                        $cacheCats[$idNum_Mod] = $this->serviceMoodle->getOrCreateCategory(
+                            $nomMod,
+                            $idNum_Mod,
+                            $idCat_Plan, // <-- Padre Plan (Indiscutible)
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Modulo = $cacheCats[$idNum_Mod]; // <-- Variable Única Nivel 5
 
-                // ======================================================
-                // NIVEL 5: MÓDULO FORMATIVO (Padre: $idCat_Plan) - AQUÍ FALLABA
-                // ======================================================
-                // Al usar $idCat_Plan, aseguramos que el padre sea SIEMPRE el Plan,
-                // y nunca el Módulo anterior.
-                $idNum_Mod = $idNum_Plan . '_MF_' . $row['id_modulo'];
-                if (!isset($cacheCats[$idNum_Mod])) {
-                    $nomMod = mb_strimwidth($row['nombre_modulo'], 0, 100, "...");
-                    $cacheCats[$idNum_Mod] = $this->serviceMoodle->getOrCreateCategory(
-                        $nomMod,
-                        $idNum_Mod,
-                        $idCat_Plan, // <-- Padre Plan (Indiscutible)
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Modulo = $cacheCats[$idNum_Mod]; // <-- Variable Única Nivel 5
+                    // ======================================================
+                    // NIVEL 6: SEMESTRE (Padre: $idCat_Modulo)
+                    // ======================================================
+                    $idNum_Sem = $idNum_Mod . '_SEM_' . $row['id_semestre'];
+                    if (!isset($cacheCats[$idNum_Sem])) {
+                        $cacheCats[$idNum_Sem] = $this->serviceMoodle->getOrCreateCategory(
+                            'SEMESTRE ' . $row['nombre_semestre'],
+                            $idNum_Sem,
+                            $idCat_Modulo, // <-- Padre Módulo
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Semestre = $cacheCats[$idNum_Sem]; // <-- Variable Única Nivel 6
 
-                // ======================================================
-                // NIVEL 6: SEMESTRE (Padre: $idCat_Modulo)
-                // ======================================================
-                $idNum_Sem = $idNum_Mod . '_SEM_' . $row['id_semestre'];
-                if (!isset($cacheCats[$idNum_Sem])) {
-                    $cacheCats[$idNum_Sem] = $this->serviceMoodle->getOrCreateCategory(
-                        'SEMESTRE ' . $row['nombre_semestre'],
-                        $idNum_Sem,
-                        $idCat_Modulo, // <-- Padre Módulo
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Semestre = $cacheCats[$idNum_Sem]; // <-- Variable Única Nivel 6
+                    // ======================================================
+                    // NIVEL 7: TURNO (Padre: $idCat_Semestre)
+                    // ======================================================
+                    $turNombre = 'TURNO ' . ($turnoMap[$row['turno']] ?? $row['turno']);
+                    $idNum_Tur = $idNum_Sem . '_T_' . $row['turno'];
 
-                // ======================================================
-                // NIVEL 7: TURNO (Padre: $idCat_Semestre)
-                // ======================================================
-                $turNombre = 'TURNO ' . ($turnoMap[$row['turno']] ?? $row['turno']);
-                $idNum_Tur = $idNum_Sem . '_T_' . $row['turno'];
+                    if (!isset($cacheCats[$idNum_Tur])) {
+                        $cacheCats[$idNum_Tur] = $this->serviceMoodle->getOrCreateCategory(
+                            $turNombre,
+                            $idNum_Tur,
+                            $idCat_Semestre, // <-- Padre Semestre
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Turno = $cacheCats[$idNum_Tur]; // <-- Variable Única Nivel 7
 
-                if (!isset($cacheCats[$idNum_Tur])) {
-                    $cacheCats[$idNum_Tur] = $this->serviceMoodle->getOrCreateCategory(
-                        $turNombre,
-                        $idNum_Tur,
-                        $idCat_Semestre, // <-- Padre Semestre
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Turno = $cacheCats[$idNum_Tur]; // <-- Variable Única Nivel 7
+                    // ======================================================
+                    // NIVEL 8: SECCIÓN (Padre: $idCat_Turno)
+                    // ======================================================
+                    $secNombre = 'SECCIÓN ' . $row['seccion'];
+                    $idNum_Sec = $idNum_Tur . '_SEC_' . $row['seccion'];
+                    if (!isset($cacheCats[$idNum_Sec])) {
+                        $cacheCats[$idNum_Sec] = $this->serviceMoodle->getOrCreateCategory(
+                            $secNombre,
+                            $idNum_Sec,
+                            $idCat_Turno, // <-- Padre Turno
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN
+                        );
+                    }
+                    $idCat_Seccion = $cacheCats[$idNum_Sec]; // <-- Variable Única Nivel 8
 
-                // ======================================================
-                // NIVEL 8: SECCIÓN (Padre: $idCat_Turno)
-                // ======================================================
-                $secNombre = 'SECCIÓN ' . $row['seccion'];
-                $idNum_Sec = $idNum_Tur . '_SEC_' . $row['seccion'];
-                if (!isset($cacheCats[$idNum_Sec])) {
-                    $cacheCats[$idNum_Sec] = $this->serviceMoodle->getOrCreateCategory(
-                        $secNombre,
-                        $idNum_Sec,
-                        $idCat_Turno, // <-- Padre Turno
-                        $MOODLE_URL,
-                        $MOODLE_TOKEN
-                    );
-                }
-                $idCat_Seccion = $cacheCats[$idNum_Sec]; // <-- Variable Única Nivel 8
+                    // ======================================================
+                    // NIVEL 9: CURSO (Padre: $idCat_Seccion)
+                    // ======================================================
+                    $idnumber_Curso = 'PROG_' . $row['id_programacion'];
+                    $codProg = !empty($row['codigo_programa']) ? $row['codigo_programa'] : 'PR' . $row['id_programa'];
+                    $shortname = $codProg . '-UD' . $row['id_ud'] . '-' . $row['seccion'] . '-' . $row['turno'];
+                    $fullname = $row['nombre_ud'] . ' - ' . $row['seccion'] . ' ' . $row['turno'];
+                    $indicadores = $row['indicadores'];
+                    $numSecciones = max(1, count($indicadores));
+                    $moodleCourseId = $this->serviceMoodle->createCourse([
+                        'fullname'   => $fullname,
+                        'shortname'  => $shortname,
+                        'categoryId' => $idCat_Seccion, // <-- Usamos la variable de Sección
+                        'idnumber'   => $idnumber_Curso,
+                        'summary'    => "Unidad Didáctica: {$row['nombre_ud']}.",
+                        'numsections' => $numSecciones,
+                    ], $MOODLE_URL, $MOODLE_TOKEN);
 
-                // ======================================================
-                // NIVEL 9: CURSO (Padre: $idCat_Seccion)
-                // ======================================================
-                $idnumber_Curso = 'PROG_' . $row['id_programacion'];
-                $codProg = !empty($row['codigo_programa']) ? $row['codigo_programa'] : 'PR' . $row['id_programa'];
-                $shortname = $codProg . '-UD' . $row['id_ud'] . '-' . $row['seccion'] . '-' . $row['turno'];
-                $fullname = $row['nombre_ud'] . ' - ' . $row['seccion'] . ' ' . $row['turno'];
-                $indicadores = $row['indicadores'];
-                $numSecciones = max(1, count($indicadores));
-                $moodleCourseId = $this->serviceMoodle->createCourse([
-                    'fullname'   => $fullname,
-                    'shortname'  => $shortname,
-                    'categoryId' => $idCat_Seccion, // <-- Usamos la variable de Sección
-                    'idnumber'   => $idnumber_Curso,
-                    'summary'    => "Unidad Didáctica: {$row['nombre_ud']}.",
-                    'numsections' => $numSecciones,
-                ], $MOODLE_URL, $MOODLE_TOKEN);
-
-                if ($moodleCourseId) {
-                    // Renombrar secciones en Moodle (1..N; sección 0 es “General”)
-                    $sectionNames = [];
-                    $i = 1;
-                    foreach ($indicadores as $ind) {
-                        $titulo = 'Indicador de logro ' . $i;
-                        $summary = '
+                    if ($moodleCourseId) {
+                        // Renombrar secciones en Moodle (1..N; sección 0 es “General”)
+                        $sectionNames = [];
+                        $i = 1;
+                        foreach ($indicadores as $ind) {
+                            $titulo = 'Indicador de logro ' . $i;
+                            $summary = '
                         <div class="sigi-indicador">
                         <ul>
                             <li><strong>Código:</strong> ' . htmlspecialchars($ind['codigo_capacidad'] . '.' . $ind['codigo'], ENT_QUOTES, 'UTF-8') . '</li>
                             <li><strong>Descripción:</strong> ' . htmlspecialchars($ind['descripcion'], ENT_QUOTES, 'UTF-8') . '</li>
                         </ul>
                         </div>';
-                        $sectionNames[] = ['section' => $i, 'name' => $titulo, 'summary' => $summary, 'summaryformat' => 1];
-                        $i++;
-                    }
-                    $sectionNamesResult = $this->serviceMoodle->setSectionNames($moodleCourseId, $sectionNames, $MOODLE_URL, $MOODLE_TOKEN);
-                    if ($sectionNamesResult) {
-                        $cursosCreados++;
-                        $listaCursos[$row['id_programacion']] = $moodleCourseId;
-                    } else {
-                        $errores[] = "Error renombrando secciones del curso: $shortname";
-                    }
-                    // matricular docente
-                    if ($row['docente_distinto']) {
-                        $id_ies = '';
-                        $sigiId = $row['id_docente'];
-                        $dni = $row['dni_docente'];
-                        $email = $row['dni_docente'] . $SUFIJO_EMAIL;
-                        $nombres = $row['nombre_docente'];
-                        $apellidos = $row['apellidos_docente'];
-                        $passwordPlano = null;
-                        $rol_docente = 3;
-                        $docente = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
-                        $matriculaDocente = $this->serviceMoodle->enrolUserToCourse($moodleCourseId, $docente['id'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
-                        if ($matriculaDocente) {
-                            $docenteMatriculados++;
-                            if ($row['id_moodle_docente_anterior']) {
-                                $desmatriculaDocente = $this->serviceMoodle->unenrolUserFromCourse($moodleCourseId, $row['id_moodle_docente_anterior'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
-                                if (!$desmatriculaDocente) {
-                                    $errores[] = "Error desmatriculando docente anterior: " . $row['id_moodle_docente_anterior'];
-                                }
-                            }
-                        } else {
-                            $errores[] = "Error matriculando docente: $nombres $apellidos";
+                            $sectionNames[] = ['section' => $i, 'name' => $titulo, 'summary' => $summary, 'summaryformat' => 1];
+                            $i++;
                         }
+                        $sectionNamesResult = $this->serviceMoodle->setSectionNames($moodleCourseId, $sectionNames, $MOODLE_URL, $MOODLE_TOKEN);
+                        if ($sectionNamesResult) {
+                            $cursosCreados++;
+                            $listaCursos[$row['id_programacion']] = $moodleCourseId;
+                        } else {
+                            $errores[] = "Error renombrando secciones del curso: $shortname";
+                        }
+                        // matricular docente
+                        if ($row['docente_distinto']) {
+                            $id_ies = '';
+                            $sigiId = $row['id_docente'];
+                            $dni = $row['dni_docente'];
+                            $email = $row['dni_docente'] . $SUFIJO_EMAIL;
+                            $nombres = $row['nombre_docente'];
+                            $apellidos = $row['apellidos_docente'];
+                            $passwordPlano = null;
+                            $rol_docente = 3;
+                            $docente = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano);
+                            $matriculaDocente = $this->serviceMoodle->enrolUserToCourse($moodleCourseId, $docente['id'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
+                            if ($matriculaDocente) {
+                                $docenteMatriculados++;
+                                if ($row['id_moodle_docente_anterior']) {
+                                    $desmatriculaDocente = $this->serviceMoodle->unenrolUserFromCourse($moodleCourseId, $row['id_moodle_docente_anterior'], $rol_docente, $MOODLE_URL, $MOODLE_TOKEN);
+                                    if (!$desmatriculaDocente) {
+                                        $errores[] = "Error desmatriculando docente anterior: " . $row['id_moodle_docente_anterior'];
+                                    }
+                                }
+                            } else {
+                                $errores[] = "Error matriculando docente: $nombres $apellidos";
+                            }
+                        }
+                    } else {
+                        $errores[] = "Error creando curso: $shortname";
                     }
-                } else {
-                    $errores[] = "Error creando curso: $shortname";
+                } catch (\Exception $e) {
+                    $errores[] = "Excepción en ID Prog {$row['id_programacion']}: " . $e->getMessage();
                 }
-            } catch (\Exception $e) {
-                $errores[] = "Excepción en ID Prog {$row['id_programacion']}: " . $e->getMessage();
             }
         }
 
@@ -425,19 +426,77 @@ class IntegracionController extends BaseApiController
     {
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
-
+        $ies = $this->objIes->find($this->tenantId);
         $id_programacion = 'PROG_' . $data['id_programacion'];
+        $this->requireApiKey($this->endpointSyncCourseMoodle);
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            $MOODLE_URL = $ies['MOODLE_URL'];
+            $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+            $resp = $this->serviceMoodle->deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN);
+
+            $this->json([
+                'success' => $resp,
+                'message' => $resp ? 'Curso eliminado exitosamente' : 'Error eliminando curso',
+            ]);
+            exit;
+        }
+    }
+
+
+    public function sincronizarMatriculaEstudiante()
+    {
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+
+        $datos = $data['data'];
         $this->requireApiKey($this->endpointSyncCourseMoodle);
 
         $ies = $this->objIes->find($this->tenantId);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
-
-        $resp = $this->serviceMoodle->deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN);
-
+        $SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
+        $id_ies = '';
+        $roleId = 5; // estudiante
+        $id_user_moodle = 0;
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            if ($ies['syncUserIntegraciones']) {
+                # code...
+            }
+            //datos de estudiante
+            $id_user_moodle = $this->serviceMoodle->findUserById($MOODLE_URL, $MOODLE_TOKEN, $datos['id_estudiante']);
+            if (!$id_user_moodle) {
+                $usersPayload[] = [
+                    'username'      => $datos['dni'],
+                    'password'      => $datos['password'], // La clave plana "Sigi..." que enviaste
+                    'firstname'     => $datos['Nombres'],
+                    'lastname'      => $datos['Apellidos'],
+                    'email'         => $datos['dni'] . $SUFIJO_EMAIL,
+                    'auth'          => 'manual',
+                    'idnumber'      => (string)$datos['id_estudiante'], // VINCULACIÓN: ID de SIGI Local
+                    'preferences'   => [
+                        ['type'  => 'auth_forcepasswordchange', 'value' => 0]
+                    ]
+                ];
+                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $datos['id_estudiante'], $datos['dni'], ($datos['id_estudiante'] . $SUFIJO_EMAIL), $datos['Nombres'], $datos['Apellidos'],  $datos['password']);
+                if ($resp['id']) {
+                    $id_user_moodle = $resp['id'];
+                }
+            }
+        }
+        $ud_programadas = $datos['ud_programadas'];
+        $cantMatriculas = 0;
+        foreach ($ud_programadas as $id_sigi_programacion_ud => $id_moodle_course) {
+            $resp = $this->serviceMoodle->enrolUserToCourse($id_moodle_course, $id_user_moodle, $roleId, $MOODLE_URL, $MOODLE_TOKEN);
+            if ($resp) {
+                $cantMatriculas++;
+            }
+        }
+        $response = $cantMatriculas > 0 ? true : false;
         $this->json([
-            'success' => $resp,
-            'message' => $resp ? 'Curso eliminado exitosamente' : 'Error eliminando curso',
+            'success' => $response,
+            'message' => $response ? 'Matricula exitosa' : 'Error matriculando curso',
+            'cantMatriculas' => $cantMatriculas,
         ]);
         exit;
     }
