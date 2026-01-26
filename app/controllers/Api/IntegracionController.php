@@ -190,7 +190,8 @@ class IntegracionController extends BaseApiController
         $programacion = json_decode($json_data, true);
 
         // Obtener credenciales
-        $ies = $this->objIes->find($this->tenantId);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
         $SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
@@ -424,7 +425,8 @@ class IntegracionController extends BaseApiController
 
     public function deleteProgramacionUd()
     {
-        $ies = $this->objIes->find($this->tenantId);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
         $json_data = file_get_contents('php://input');
         $data = json_decode($json_data, true);
         $id_programacion = 'PROG_' . $data['id_programacion'];
@@ -452,12 +454,11 @@ class IntegracionController extends BaseApiController
 
         $datos = $data['data'];
         $this->requireApiKey($this->endpointSyncMatriculaMoodle);
-
-        $ies = $this->objIes->find($this->tenantId);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
         $SUFIJO_EMAIL = $ies['MICROSOFT_SUFIJO_EMAIL'];
-        $id_ies = '';
         $roleId = 5; // estudiante
         $id_user_moodle = 0;
         if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
@@ -502,7 +503,8 @@ class IntegracionController extends BaseApiController
         $datos = $data['data'];
         $roleId = $data['roleMoodle'] ?? 5;
         $this->requireApiKey($this->endpointSyncMatriculaMoodle);
-        $ies = $this->objIes->find($this->tenantId);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
         $cantMatriculas = 0;
@@ -528,7 +530,8 @@ class IntegracionController extends BaseApiController
         $data = json_decode($json_data, true);
         $datos = $data['data'];
         $this->requireApiKey($this->endpointSyncMatriculaMoodle);
-        $ies = $this->objIes->find($this->tenantId);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
         $MOODLE_URL = $ies['MOODLE_URL'];
         $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
         $roleId = $data['roleMoodle'] ?? 5;
