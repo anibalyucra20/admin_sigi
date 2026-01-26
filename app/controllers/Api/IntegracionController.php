@@ -460,23 +460,20 @@ class IntegracionController extends BaseApiController
         $roleId = 5; // estudiante
         $id_user_moodle = 0;
         if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
-            if ($ies['syncUserIntegraciones']) {
-                # code...
-            }
             //datos de estudiante
-            /*$id_user_moodle = $this->serviceMoodle->findUserById($MOODLE_URL, $MOODLE_TOKEN, $datos['id_estudiante']);
-            if ($id_user_moodle != false) {*/
-            $sigiId = $datos['id_estudiante'];
-            $dni = $datos['dni'];
-            $email = $datos['dni'] . $SUFIJO_EMAIL;
-            $nombres = $datos['Nombres'];
-            $apellidos = $datos['Apellidos'];
-            $passwordPlano = $datos['password'];
-            $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos,  $passwordPlano);
-            if ($resp['id']) {
-                $id_user_moodle = $resp['id'];
+            $id_user_moodle = $this->serviceMoodle->findUserById($MOODLE_URL, $MOODLE_TOKEN, $datos['id_estudiante']);
+            if (!$id_user_moodle) {
+                $sigiId = $datos['id_estudiante'];
+                $dni = $datos['dni'];
+                $email = $datos['dni'] . $SUFIJO_EMAIL;
+                $nombres = $datos['Nombres'];
+                $apellidos = $datos['Apellidos'];
+                $passwordPlano = $datos['password'];
+                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos,  $passwordPlano);
+                if ($resp['id']) {
+                    $id_user_moodle = $resp['id'];
+                }
             }
-            /*}*/
         }
         $ud_programadas = $datos['ud_programadas'];
         $cantMatriculas = 0;
