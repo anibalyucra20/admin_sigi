@@ -330,7 +330,7 @@ class MoodleService
     {
         $courses = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
-            'value' => (string)$id_programacion,
+            'value' => (string)$id_programacion
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (empty($courses['courses'][0]['id'])) {
