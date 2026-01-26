@@ -436,8 +436,9 @@ class IntegracionController extends BaseApiController
             $resp = $this->serviceMoodle->deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN);
 
             $this->json([
-                'success' => $resp,
-                'message' => $resp ? 'Curso eliminado exitosamente' : 'Error eliminando curso',
+                'success' => $resp['success'],
+                'message' => $resp['success'] ? 'Curso eliminado exitosamente' : 'Error eliminando curso',
+                'errores' => $resp['errores'],
             ]);
             exit;
         }

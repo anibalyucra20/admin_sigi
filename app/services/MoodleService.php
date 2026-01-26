@@ -326,27 +326,36 @@ class MoodleService
     }
 
 
-    public function deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN)
+    public function deleteProgramacionUd($id_programacion, $MOODLE_URL, $MOODLE_TOKEN): array
     {
+        $errores = [];
+
         $courses = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
             'value' => (string)$id_programacion
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (empty($courses['courses'][0]['id'])) {
-            return true; // ya no existe
+        if (is_array($courses) && (isset($courses['exception']) || isset($courses['errorcode']))) {
+            return ['success' => false, 'errores' => ['Error buscando curso: ' . json_encode($courses)]];
         }
+
+        if (empty($courses['courses'][0]['id'])) {
+            return ['success' => true, 'errores' => []]; // ya no existe
+        }
+
         $courseid = (int)$courses['courses'][0]['id'];
+
         $resp = $this->call('core_course_delete_courses', [
             'courseids' => [$courseid]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (is_array($resp) && (isset($resp['exception']) || isset($resp['errorcode']))) {
-            return false;
+            return ['success' => false, 'errores' => ['Error eliminando curso: ' . json_encode($resp)]];
         }
 
-        return true;
+        return ['success' => true, 'errores' => []];
     }
+
 
     public function setSectionNames($courseId, array $sections, $MOODLE_URL, $MOODLE_TOKEN)
     {
