@@ -466,20 +466,13 @@ class IntegracionController extends BaseApiController
             //datos de estudiante
             $id_user_moodle = $this->serviceMoodle->findUserById($MOODLE_URL, $MOODLE_TOKEN, $datos['id_estudiante']);
             if ($id_user_moodle != false) {
-                $usersPayload[] = [
-                    'username'      => $datos['dni'],
-                    'password'      => $datos['password'], // La clave plana "Sigi..." que enviaste
-                    'firstname'     => $datos['Nombres'],
-                    'lastname'      => $datos['Apellidos'],
-                    'email'         => $datos['dni'] . $SUFIJO_EMAIL,
-                    'auth'          => 'manual',
-                    'idnumber'      => (string)$datos['id_estudiante'], // VINCULACIÓN: ID de SIGI Local
-                    'preferences'   => [
-                        ['type'  => 'auth_forcepasswordchange', 'value' => 0]
-                    ]
-                ];
-                $correo = $datos['dni'] . $SUFIJO_EMAIL;
-                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $datos['id_estudiante'], $datos['dni'], $correo, $datos['Nombres'], $datos['Apellidos'],  $datos['password']);
+                $sigiId = $datos['id_estudiante'];
+                $dni = $datos['dni'];
+                $email = $datos['dni'] . $SUFIJO_EMAIL;
+                $nombres = $datos['Nombres'];
+                $apellidos = $datos['Apellidos'];
+                $passwordPlano = $datos['password'];
+                $resp = $this->serviceMoodle->syncUser($MOODLE_URL, $MOODLE_TOKEN, $id_ies, $sigiId, $dni, $email, $nombres, $apellidos,  $passwordPlano);
                 if ($resp['id']) {
                     $id_user_moodle = $resp['id'];
                 }
