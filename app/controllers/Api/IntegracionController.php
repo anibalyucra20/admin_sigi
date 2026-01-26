@@ -535,9 +535,11 @@ class IntegracionController extends BaseApiController
         foreach ($datos as $cursos) {
             $id_curso_moodle = $cursos['id_curso_moodle'];
             $id_usuario_moodle = $cursos['id_usuario_moodle'];
-            $resp = $this->serviceMoodle->unenrolUserFromCourse($id_curso_moodle, $id_usuario_moodle, $roleId, $MOODLE_URL, $MOODLE_TOKEN);
-            if ($resp) {
-                $cantDesmatriculas++;
+            if ($id_curso_moodle && $id_usuario_moodle) {
+                $resp = $this->serviceMoodle->unenrolUserFromCourse($id_curso_moodle, $id_usuario_moodle, $roleId, $MOODLE_URL, $MOODLE_TOKEN);
+                if ($resp) {
+                    $cantDesmatriculas++;
+                }
             }
         }
         $response = $cantDesmatriculas > 0 ? true : false;
