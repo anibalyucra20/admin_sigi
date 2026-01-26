@@ -22,7 +22,7 @@ class IntegracionController extends BaseApiController
     private $endpointSynUserIntegraciones = "/api/consulta/sync_user_integraciones/";
     private $endpointLoginMoodle = "/api/consulta/login_user_Moodle/";
     private $endpointSyncCourseMoodle = "/api/consulta/sync_course_moodle/";
-    private $endpointSyncCategoryMoodle = "/api/consulta/sync_category_moodle/";
+    private $endpointSyncMatriculaMoodle = "/api/consulta/sync_matricula_moodle/";
     private $endpointUserMicrosoft = "/api/consulta/sync_user_integraciones/";
     private $endpointMeetMicrosoft = "/api/consulta/meet_microsoft/";
 
@@ -450,7 +450,7 @@ class IntegracionController extends BaseApiController
         $data = json_decode($json_data, true);
 
         $datos = $data['data'];
-        $this->requireApiKey($this->endpointSyncCourseMoodle);
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
 
         $ies = $this->objIes->find($this->tenantId);
         $MOODLE_URL = $ies['MOODLE_URL'];
@@ -488,6 +488,63 @@ class IntegracionController extends BaseApiController
             'success' => $response,
             'message' => $response ? 'Matricula exitosa' : 'Error matriculando curso',
             'cantMatriculas' => $cantMatriculas,
+        ]);
+        exit;
+    }
+
+
+    //===================== agregar matriculas =====================================
+    public function addMatriculas()
+    {
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        $datos = $data['data'];
+        $roleId = $data['roleMoodle'] ?? 5;
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
+        $ies = $this->objIes->find($this->tenantId);
+        $MOODLE_URL = $ies['MOODLE_URL'];
+        $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+        $cantMatriculas = 0;
+        foreach ($datos as $id_moodle_course => $id_user_moodle) {
+            $resp = $this->serviceMoodle->enrolUserToCourse($id_moodle_course, $id_user_moodle, $roleId, $MOODLE_URL, $MOODLE_TOKEN);
+            if ($resp) {
+                $cantMatriculas++;
+            }
+        }
+        $response = $cantMatriculas > 0 ? true : false;
+        $this->json([
+            'success' => $response,
+            'message' => $response ? 'Matricula exitosa' : 'Error matriculando curso',
+            'cantMatriculas' => $cantMatriculas,
+        ]);
+        exit;
+    }
+
+    // ==================== eliminar matriculas ======================================
+    public function deleteUserInCourse()
+    {
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        $datos = $data['data'];
+        $this->requireApiKey($this->endpointSyncMatriculaMoodle);
+        $ies = $this->objIes->find($this->tenantId);
+        $MOODLE_URL = $ies['MOODLE_URL'];
+        $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+        $roleId = $data['roleMoodle'] ?? 5;
+        $cantDesmatriculas = 0;
+        foreach ($datos as $cursos) {
+            $id_curso_moodle = $cursos['id_curso_moodle'];
+            $id_usuario_moodle = $cursos['id_usuario_moodle'];
+            $resp = $this->serviceMoodle->unenrolUserFromCourse($id_curso_moodle, $id_usuario_moodle, $roleId, $MOODLE_URL, $MOODLE_TOKEN);
+            if ($resp) {
+                $cantDesmatriculas++;
+            }
+        }
+        $response = $cantDesmatriculas > 0 ? true : false;
+        $this->json([
+            'success' => $response,
+            'message' => $response ? 'Matriculas eliminadas exitosamente en moodle' : 'Error eliminando matriculas en moodle',
+            'cantDesmatriculas' => $cantDesmatriculas,
         ]);
         exit;
     }
