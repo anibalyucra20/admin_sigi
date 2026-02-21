@@ -201,6 +201,7 @@ class IntegracionController extends BaseApiController
         $cursosCreados = 0;
         $docenteMatriculados = 0;
         $listaCursos = [];
+        $secciones = [];
         $responseApi = [];
 
         // Mapeo de Turnos
@@ -372,7 +373,7 @@ class IntegracionController extends BaseApiController
                         if (isset($sectionNamesResult['success']) && $sectionNamesResult['success'] === true) {
                             $cursosCreados++;
                             $listaCursos[$row['id_programacion']] = $moodleCourseId;
-                            $listaCursos['secciones' . $row['id_programacion']] = $sectionNamesResult;
+                            $secciones[$row['id_programacion']] = $sectionNamesResult;
                         } else {
                             $errores[] = "Error renombrando secciones del curso: $shortname";
                         }
@@ -416,6 +417,7 @@ class IntegracionController extends BaseApiController
         $responseApi['cursosCreados'] = $cursosCreados;
         $responseApi['docentesMatriculados'] = $docenteMatriculados;
         $responseApi['listaCursos'] = $listaCursos;
+        $responseApi['secciones_cursos'] = $secciones;
         $responseApi['errores'] = $errores;
 
         $this->json($responseApi);
