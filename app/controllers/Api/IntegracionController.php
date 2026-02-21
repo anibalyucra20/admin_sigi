@@ -372,7 +372,7 @@ class IntegracionController extends BaseApiController
                         if (isset($sectionNamesResult['success']) && $sectionNamesResult['success'] === true) {
                             $cursosCreados++;
                             $listaCursos[$row['id_programacion']] = $moodleCourseId;
-                            $listaCursos[$row['id_programacion']]['secciones'] = $sectionNamesResult;
+                            $listaCursos['secciones' . $row['id_programacion']] = $sectionNamesResult;
                         } else {
                             $errores[] = "Error renombrando secciones del curso: $shortname";
                         }
