@@ -22,7 +22,8 @@ class MoodleService
         if (empty($moodleUser) || isset($moodleUser['exception'])) {
             return false;
         }
-        return $moodleUser[0]['id'];
+        if (!is_array($moodleUser) || empty($moodleUser[0]['id'])) return false;
+        return (int)$moodleUser[0]['id'];
     }
     /**
      * Sincroniza (Crea o Actualiza) un usuario de SIGI hacia Moodle.

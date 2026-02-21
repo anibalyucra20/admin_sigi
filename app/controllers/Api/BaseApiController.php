@@ -157,7 +157,7 @@ class BaseApiController extends Controller
             VALUES (?, DATE_FORMAT(CURDATE(), '%Y%m'), ?, 1, ?, NOW(), NOW())
             ON DUPLICATE KEY UPDATE requests = requests + 1, bytes = bytes + VALUES(bytes), updated_at=NOW()
         ");
-        $st->execute([$this->tenantId, substr($endpoint, 0, 100), $bytes]);
+        $st->execute([$this->tenantId, substr($endpoint, 0, 150), $bytes]);
     }
 
     protected function ensureDir(string $dir): void

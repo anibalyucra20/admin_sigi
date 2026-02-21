@@ -22,6 +22,7 @@ class IntegracionController extends BaseApiController
     private $endpointSynUserIntegraciones = "/api/consulta/sync_user_integraciones/";
     private $endpointLoginMoodle = "/api/consulta/login_user_Moodle/";
     private $endpointSyncCourseMoodle = "/api/consulta/sync_course_moodle/";
+    private $endpointDeleteProgramacionUd = "/api/consulta/delete_course_moodle/";
     private $endpointSyncMatriculaMoodle = "/api/consulta/sync_matricula_moodle/";
     private $endpointUserMicrosoft = "/api/consulta/sync_user_integraciones/";
     private $endpointMeetMicrosoft = "/api/consulta/meet_microsoft/";
@@ -368,15 +369,16 @@ class IntegracionController extends BaseApiController
                             $i++;
                         }
                         $sectionNamesResult = $this->serviceMoodle->setSectionNames($moodleCourseId, $sectionNames, $MOODLE_URL, $MOODLE_TOKEN);
-                        if ($sectionNamesResult) {
+                        if (isset($sectionNamesResult['success']) && $sectionNamesResult['success'] === true) {
                             $cursosCreados++;
                             $listaCursos[$row['id_programacion']] = $moodleCourseId;
+                            $listaCursos[$row['id_programacion']]['secciones'] = $sectionNamesResult;
                         } else {
                             $errores[] = "Error renombrando secciones del curso: $shortname";
                         }
                         // matricular docente
                         if ($row['docente_distinto']) {
-                            $id_ies = '';
+                            $id_ies = $this->tenantId;
                             $sigiId = $row['id_docente'];
                             $dni = $row['dni_docente'];
                             $email = $row['dni_docente'] . $SUFIJO_EMAIL;
@@ -424,7 +426,7 @@ class IntegracionController extends BaseApiController
 
     public function deleteProgramacionUd()
     {
-        $this->requireApiKey($this->endpointSyncCourseMoodle);
+        $this->requireApiKey($this->endpointDeleteProgramacionUd);
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
         $json_data = file_get_contents('php://input');
