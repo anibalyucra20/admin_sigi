@@ -415,20 +415,43 @@ class MoodleService
         $response = $this->call('core_course_get_contents', [
             'courseid' => $courseid,
         ], $MOODLE_URL, $MOODLE_TOKEN);
-        $curso_contenido = $response;
-        $respuesta = [];
-        if (is_array($curso_contenido) || is_object($curso_contenido)) {
-            foreach ($curso_contenido as $section) {
-                // Buscamos la sección que coincide con tu ID
-                // Usamos casting (object) por si la respuesta viene como array asociativo
-                $sectionObj = (object)$section;
 
-                if ($sectionObj->id == $id_section) {
-                    $respuesta = $sectionObj->modules;
-                    break; // Terminamos el bucle una vez encontrada la sección
+        if (isset($response['exception'])) {
+            return ['error' => true, 'message' => $response['message']];
+        }
+
+        $curso_completo = $response; // Guardamos todo el curso para buscar secciones hijas
+        $modulos_finales = [];
+        foreach ($curso_completo as $section) {
+            $sectionObj = (object)$section;
+            if ($sectionObj->id == $id_section) {
+                foreach ($sectionObj->modules as $modulo) {
+                    $modulo = (array)$modulo;
+                    // Agregamos el módulo actual
+                    $modulos_finales[] = $modulo;
+                    // SI ES UNA SUBSECCIÓN, BUSCAMOS SUS HIJOS
+                    if ($modulo['modname'] == 'subsection' && !empty($modulo['customdata'])) {
+                        $customData = json_decode($modulo['customdata'], true);
+                        $subSectionId = $customData['sectionid'] ?? null;
+
+                        if ($subSectionId) {
+                            // Buscamos la sección que corresponde a ese ID en el curso completo
+                            foreach ($curso_completo as $s) {
+                                if ($s['id'] == $subSectionId) {
+                                    // Marcamos estos módulos como "hijos" o simplemente los añadimos
+                                    foreach ($s['modules'] as $subModulo) {
+                                        $subModulo = (array)$subModulo;
+                                        $subModulo['is_child_of'] = $modulo['id']; // Referencia opcional
+                                        $modulos_finales[] = $subModulo;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
+                break;
             }
         }
-        return $respuesta;
+        return $modulos_finales;
     }
 }
