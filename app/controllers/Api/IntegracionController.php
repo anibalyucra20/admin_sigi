@@ -577,11 +577,13 @@ class IntegracionController extends BaseApiController
                 'success' => true,
                 'message' => $this->serviceMoodle->getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN)
             ]);
+            exit;
         } else {
             $this->json([
                 'success' => false,
                 'message' => 'No cuenta con integración con Moodle'
             ]);
+            exit;
         }
     }
 
