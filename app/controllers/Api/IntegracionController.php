@@ -558,5 +558,33 @@ class IntegracionController extends BaseApiController
         ]);
         exit;
     }
+
+    //===================== buscar elementos de una seccion de curso
+    public function getSectionData()
+    {
+        $this->requireApiKey($this->endpointLoginMoodle);
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+        $MOODLE_URL = $ies['MOODLE_URL'];
+        $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            $json_data = file_get_contents('php://input');
+            $data = json_decode($json_data, true);
+            $id_section = $data['id_section'];
+            $courseid = $data['courseid'];
+            $this->json([
+                'success' => true,
+                'message' => $this->serviceMoodle->getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN)
+            ]);
+        } else {
+            $this->json([
+                'success' => false,
+                'message' => 'No cuenta con integración con Moodle'
+            ]);
+        }
+    }
+
+
+
     //=============================== FIN INTEGRACIONES ===============================
 }

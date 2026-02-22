@@ -408,4 +408,21 @@ class MoodleService
 
         return true;
     }
+
+    //===================== buscar elementos de una seccion de un cursos
+    public function getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN)
+    {
+        $response = $this->call('core_course_get_contents', [
+            'courseid' => $courseid,
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+        $curso_contenido = json_decode($response);
+        $respuesta = [];
+        foreach ($curso_contenido as $section) {
+            // Buscamos la sección que coincide con tu ID
+            if ($section->id == $id_section) {
+                $respuesta = $section->modules;
+            }
+        }
+        return $respuesta;
+    }
 }
