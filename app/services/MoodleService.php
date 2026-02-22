@@ -415,12 +415,18 @@ class MoodleService
         $response = $this->call('core_course_get_contents', [
             'courseid' => $courseid,
         ], $MOODLE_URL, $MOODLE_TOKEN);
-        $curso_contenido = json_decode($response);
+        $curso_contenido = $response;
         $respuesta = [];
-        foreach ($curso_contenido as $section) {
-            // Buscamos la sección que coincide con tu ID
-            if ($section->id == $id_section) {
-                $respuesta = $section->modules;
+        if (is_array($curso_contenido) || is_object($curso_contenido)) {
+            foreach ($curso_contenido as $section) {
+                // Buscamos la sección que coincide con tu ID
+                // Usamos casting (object) por si la respuesta viene como array asociativo
+                $sectionObj = (object)$section;
+
+                if ($sectionObj->id == $id_section) {
+                    $respuesta = $sectionObj->modules;
+                    break; // Terminamos el bucle una vez encontrada la sección
+                }
             }
         }
         return $respuesta;
