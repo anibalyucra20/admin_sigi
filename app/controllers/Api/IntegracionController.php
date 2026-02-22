@@ -575,7 +575,7 @@ class IntegracionController extends BaseApiController
             //$this->json($data);
             $this->json([
                 'success' => true,
-                'message' => json_encode($this->serviceMoodle->getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN))
+                'message' => $this->serviceMoodle->getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN)
             ]);
             exit;
         } else {
