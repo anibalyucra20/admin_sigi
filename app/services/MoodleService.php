@@ -409,6 +409,22 @@ class MoodleService
         return true;
     }
 
+    //===================== buscar modulos disponibles
+    public function getEnabledModules($MOODLE_URL, $MOODLE_TOKEN)
+    {
+        // Obtener la lista de módulos instalados y activos en Moodle
+        $response = $this->call('local_sigiws_get_enabled_modules', [], $MOODLE_URL, $MOODLE_TOKEN);
+
+        // Si hay un error de comunicación o excepción de Moodle
+        if (isset($response['exception'])) {
+            return [
+                'success' => false,
+                'message' => 'Error de Moodle: ' . $response['message']
+            ];
+        }
+        return $response;
+    }
+
     //===================== buscar elementos de una seccion de un cursos
     public function getSectionData($id_section, $courseid, $MOODLE_URL, $MOODLE_TOKEN)
     {
