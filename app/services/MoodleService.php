@@ -481,9 +481,12 @@ class MoodleService
      * @param array $params Arreglo plano de configuración.
      * @return array [success => bool, cmid => int, instance => int, error => string]
      */
+    /**
+     * Crea un módulo en Moodle asegurando la existencia de la sección y el rastreo de finalización.
+     */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
     {
-        // 1. Resolver ID del Curso
+        // 1. Resolver ID numérico del curso si llega como IDNumber (ej: PROG_749)
         $realCourseId = 0;
         if (!is_numeric($courseIdOrNumber)) {
             $courseSearch = $this->call('core_course_get_courses_by_field', [
@@ -494,41 +497,58 @@ class MoodleService
             if (!empty($courseSearch['courses'][0]['id'])) {
                 $realCourseId = (int)$courseSearch['courses'][0]['id'];
             } else {
-                return ['success' => false, 'error' => "Curso no encontrado: $courseIdOrNumber"];
+                return ['success' => false, 'error' => "Curso no encontrado con IDNumber: $courseIdOrNumber"];
             }
         } else {
             $realCourseId = (int)$courseIdOrNumber;
         }
 
-        // 2. Formatear Opciones para Moodle (Importante: nombre/valor)
+        // --- SOLUCIÓN AL ERROR invalidrecordunknown ---
+        // Forzamos al curso a tener suficientes secciones y habilitar el rastreo de finalización
+        // mediante una actualización rápida antes de intentar crear el módulo.
+        $this->call('core_course_update_courses', [
+            'courses' => [[
+                'id' => $realCourseId,
+                'enablecompletion' => 1, // Habilita rastreo global en el curso
+                'courseformatoptions' => [
+                    ['name' => 'numsections', 'value' => (int)$sectionId] // Asegura que existan las N secciones
+                ]
+            ]]
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+        // ----------------------------------------------
+
+        // 2. Convertir el array de parámetros al formato "options" (name/value) que exige Moodle
         $options = [];
-        foreach ($params as $key => $val) {
-            $options[] = ['name' => (string)$key, 'value' => (string)$val];
+        foreach ($params as $name => $value) {
+            $options[] = [
+                'name' => (string)$name,
+                'value' => (string)$value
+            ];
         }
 
-        // 3. Payload
+        // 3. Preparar el envío del módulo
         $modulePayload = [
             'courseid'   => $realCourseId,
             'modulename' => (string)$modname,
-            'section'    => (int)$sectionId,
+            'section'    => (int)$sectionId, // Número de secuencia (1, 2, 3...)
             'visible'    => 1,
             'options'    => $options
         ];
 
-        // 4. Llamada técnica
+        // 4. Llamada final a Moodle
         $response = $this->call('core_course_create_modules', [
             'modules' => [$modulePayload]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // --- MANEJO DE ERRORES DETALLADO ---
+        // 5. Procesar respuesta y capturar errores detallados
         if (isset($response['exception'])) {
             return [
                 'success' => false,
-                'error' => "Excepción Moodle: " . $response['message'] . " (Código: " . $response['errorcode'] . ")"
+                'error' => "Error Moodle: " . $response['message'] . " (Código: " . $response['errorcode'] . ")"
             ];
         }
 
-        if (isset($response[0]['coursemodule'])) {
+        if (!empty($response) && is_array($response) && isset($response[0]['coursemodule'])) {
             return [
                 'success'  => true,
                 'cmid'     => $response[0]['coursemodule'],
@@ -536,6 +556,9 @@ class MoodleService
             ];
         }
 
-        return ['success' => false, 'error' => "Respuesta inesperada: " . json_encode($response)];
+        return [
+            'success' => false,
+            'error' => "Respuesta inesperada de Moodle: " . json_encode($response)
+        ];
     }
 }
