@@ -486,44 +486,29 @@ class MoodleService
      */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionNumber, $modname, $params)
     {
-        $realCourseId = 0;
         // 1. Resolver ID del Curso
         $search = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
             'value' => (string)$courseIdOrNumber
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (!empty($search['courses'][0]['id'])) {
-            $realCourseId = (int)$search['courses'][0]['id'];
-        } else {
-            return ['success' => false, 'error' => "Curso no encontrado: $courseIdOrNumber"];
-        }
+        $realCourseId = !empty($search['courses'][0]['id']) ? (int)$search['courses'][0]['id'] : (is_numeric($courseIdOrNumber) ? (int)$courseIdOrNumber : 0);
+        if ($realCourseId === 0) return ['success' => false, 'error' => "Curso no encontrado."];
 
-        // 2. VERIFICAR SI LA SECCIÓN EXISTE REALMENTE
+        // 2. OBTENER SECCIONES REALES PARA DIAGNÓSTICO
         $contents = $this->call('core_course_get_contents', ['courseid' => $realCourseId], $MOODLE_URL, $MOODLE_TOKEN);
-        $sectionExists = false;
-        foreach ($contents as $sec) {
-            if ((int)$sec['section'] === (int)$sectionNumber) {
-                $sectionExists = true;
-                break;
-            }
+        $secciones_disponibles = [];
+        foreach ($contents as $s) {
+            $secciones_disponibles[] = $s['section'];
         }
 
-        // 3. SI LA SECCIÓN NO EXISTE, LA CREAMOS AL VUELO
-        if (!$sectionExists) {
-            $this->call('core_course_create_sections', [
-                'courseid' => $realCourseId,
-                'sectionnumbers' => [(int)$sectionNumber]
-            ], $MOODLE_URL, $MOODLE_TOKEN);
-        }
-
-        // 4. Preparar Opciones (Eliminamos idnumber si causa conflicto)
+        // 3. Formatear Opciones
         $options = [];
         foreach ($params as $name => $value) {
             $options[] = ['name' => (string)$name, 'value' => (string)$value];
         }
 
-        // 5. Llamada final a Moodle
+        // 4. Llamada a Moodle
         $response = $this->call('core_course_create_modules', [
             'modules' => [[
                 'courseid'   => $realCourseId,
@@ -535,20 +520,17 @@ class MoodleService
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($response['exception'])) {
+            $lista = implode(', ', $secciones_disponibles);
             return [
                 'success' => false,
-                'error' => "Moodle: " . $response['message'] . " (Sección intentada: " . $sectionNumber . ")"
+                'error' => "Moodle: " . $response['message'] . ". Secciones en BD: [$lista]. Intentada: $sectionNumber. Curso: $realCourseId"
             ];
         }
 
         if (!empty($response[0]['coursemodule'])) {
-            return [
-                'success'  => true,
-                'cmid'     => $response[0]['coursemodule'],
-                'instance' => $response[0]['instance']
-            ];
+            return ['success' => true, 'cmid' => $response[0]['coursemodule'], 'instance' => $response[0]['instance']];
         }
 
-        return ['success' => false, 'error' => "Error desconocido: " . json_encode($response)];
+        return ['success' => false, 'error' => "Error: " . json_encode($response)];
     }
 }
