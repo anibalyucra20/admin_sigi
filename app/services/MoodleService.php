@@ -484,53 +484,75 @@ class MoodleService
     /**
      * Crea un módulo en Moodle asegurando la existencia de la sección y el rastreo de finalización.
      */
-    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionNumber, $modname, $params)
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionMaybeIdOrNumber, $modname, $params)
     {
-        // 1. Resolver ID del Curso
+        // 1) Resolver curso real
         $search = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
             'value' => (string)$courseIdOrNumber
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        $realCourseId = !empty($search['courses'][0]['id']) ? (int)$search['courses'][0]['id'] : (is_numeric($courseIdOrNumber) ? (int)$courseIdOrNumber : 0);
-        if ($realCourseId === 0) return ['success' => false, 'error' => "Curso no encontrado."];
+        $realCourseId = !empty($search['courses'][0]['id'])
+            ? (int)$search['courses'][0]['id']
+            : (is_numeric($courseIdOrNumber) ? (int)$courseIdOrNumber : 0);
 
-        // 2. OBTENER SECCIONES REALES PARA DIAGNÓSTICO
-        $contents = $this->call('core_course_get_contents', ['courseid' => $realCourseId], $MOODLE_URL, $MOODLE_TOKEN);
-        $secciones_disponibles = [];
-        foreach ($contents as $s) {
-            $secciones_disponibles[] = $s['section'];
+        if ($realCourseId === 0) {
+            return ['success' => false, 'error' => "Curso no encontrado."];
         }
 
-        // 3. Formatear Opciones
+        // 2) Traer secciones del curso (para mapear ID -> número)
+        $contents = $this->call('core_course_get_contents', ['courseid' => $realCourseId], $MOODLE_URL, $MOODLE_TOKEN);
+        if (isset($contents['exception'])) {
+            return ['success' => false, 'error' => "Error leyendo secciones: " . $contents['message']];
+        }
+
+        $sectionNumberList = [];
+        $mapIdToNumber = []; // sectionId -> sectionNumber
+        foreach ($contents as $s) {
+            $sectionNumberList[] = (int)$s['section']; // 0..N
+            $mapIdToNumber[(int)$s['id']] = (int)$s['section'];
+        }
+
+        $sectionToUse = (int)$sectionMaybeIdOrNumber;
+
+        // 3) Si lo que llega NO es un número válido, pero sí es un ID de sección, lo convertimos
+        if (!in_array($sectionToUse, $sectionNumberList, true) && isset($mapIdToNumber[$sectionToUse])) {
+            $sectionToUse = $mapIdToNumber[$sectionToUse];
+        }
+
+        // 4) Validación final
+        if (!in_array($sectionToUse, $sectionNumberList, true)) {
+            return [
+                'success' => false,
+                'error' => "Sección inválida. Disponibles: [" . implode(',', $sectionNumberList) . "]. Recibida: {$sectionMaybeIdOrNumber} (curso: {$realCourseId})"
+            ];
+        }
+
+        // 5) Formatear opciones
         $options = [];
         foreach ($params as $name => $value) {
             $options[] = ['name' => (string)$name, 'value' => (string)$value];
         }
 
-        // 4. Llamada a Moodle
+        // 6) Crear módulo
         $response = $this->call('core_course_create_modules', [
             'modules' => [[
                 'courseid'   => $realCourseId,
                 'modulename' => (string)$modname,
-                'section'    => (int)$sectionNumber,
+                'section'    => $sectionToUse, // <-- SIEMPRE NÚMERO
                 'visible'    => 1,
                 'options'    => $options
             ]]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($response['exception'])) {
-            $lista = implode(', ', $secciones_disponibles);
-            return [
-                'success' => false,
-                'error' => "Moodle: " . $response['message'] . ". Secciones en BD: [$lista]. Intentada: $sectionNumber. Curso: $realCourseId"
-            ];
+            return ['success' => false, 'error' => "Moodle: " . $response['message']];
         }
 
         if (!empty($response[0]['coursemodule'])) {
             return ['success' => true, 'cmid' => $response[0]['coursemodule'], 'instance' => $response[0]['instance']];
         }
 
-        return ['success' => false, 'error' => "Error: " . json_encode($response)];
+        return ['success' => false, 'error' => "Respuesta inesperada: " . json_encode($response)];
     }
 }
