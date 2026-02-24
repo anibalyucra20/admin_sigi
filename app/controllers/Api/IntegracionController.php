@@ -24,6 +24,7 @@ class IntegracionController extends BaseApiController
     private $endpointSyncCourseMoodle = "/api/consulta/sync_course_moodle/";
     private $endpointDeleteProgramacionUd = "/api/consulta/delete_course_moodle/";
     private $endpointSyncMatriculaMoodle = "/api/consulta/sync_matricula_moodle/";
+    private $endpointCreateModuleMoodle = "/api/integracion/createModuleMoodle";
     private $endpointUserMicrosoft = "/api/consulta/sync_user_integraciones/";
     private $endpointMeetMicrosoft = "/api/consulta/meet_microsoft/";
 
@@ -610,6 +611,73 @@ class IntegracionController extends BaseApiController
                 'message' => 'No cuenta con integración con Moodle'
             ]);
             exit;
+        }
+    }
+
+    //====================fuction crear modulo 
+    public function createModuleMoodle()
+    {
+        // 1. Validar API Key
+        $this->requireApiKey($this->endpointCreateModuleMoodle);
+
+        // 2. Obtener datos de la institución (Tenant)
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            // 3. Leer datos del SIGI Local
+            $json_data = file_get_contents('php://input');
+            $data = json_decode($json_data, true);
+
+            // Extraemos los valores del payload
+            $courseid = $data['id_programacion']; // En este contexto es el ID del curso en Moodle
+            $sectionid = $data['id_seccion_moodle'];
+            $modname = $data['modname'];
+            $moodle_params = $data['moodle_params'];
+
+            try {
+                $MOODLE_URL = $ies['MOODLE_URL'];
+                $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+                // 4. Llamar al Service para ejecutar la acción en Moodle
+                $resultado = $this->serviceMoodle->createModule(
+                    $MOODLE_URL,
+                    $MOODLE_TOKEN,
+                    $courseid,
+                    $sectionid,
+                    $modname,
+                    $moodle_params
+                );
+
+                if ($resultado['success']) {
+                    // Si Moodle devolvió éxito, retornamos el cmid y la url armada
+                    $this->json([
+                        'success' => true,
+                        'message' => 'Módulo creado exitosamente en Moodle',
+                        'data' => [
+                            'cmid' => $resultado['cmid'],
+                            'instance' => $resultado['instance'],
+                            'gradeitemid' => $resultado['gradeitemid'] ?? null,
+                            'url' => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
+                        ]
+                    ]);
+                } else {
+                    $this->json([
+                        'success' => false,
+                        'message' => 'Moodle rechazó la creación: ' . ($resultado['error'] ?? 'Error desconocido')
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->json([
+                    'success' => false,
+                    'message' => 'Excepción en API Master: ' . $e->getMessage()
+                ]);
+            }
+        } else {
+            $this->json([
+                'success' => false,
+                'message' => 'La institución no tiene activa la sincronización con Moodle'
+            ]);
         }
     }
 

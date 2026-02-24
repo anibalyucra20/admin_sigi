@@ -470,4 +470,58 @@ class MoodleService
         }
         return $modulos_finales;
     }
+
+    /**
+     * Crea un módulo (actividad o recurso) en un curso de Moodle.
+     * * @param string $MOODLE_URL
+     * @param string $MOODLE_TOKEN
+     * @param int $courseId ID del curso en Moodle.
+     * @param int $sectionId ID o número de sección.
+     * @param string $modname Nombre del módulo (assign, quiz, forum, etc).
+     * @param array $params Arreglo plano de configuración.
+     * @return array [success => bool, cmid => int, instance => int, error => string]
+     */
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseId, $sectionId, $modname, $params)
+    {
+        // 1. Convertir el arreglo plano de SIGI al formato "options" que exige Moodle
+        $options = [];
+        foreach ($params as $name => $value) {
+            // Moodle requiere que todos los valores en options sean strings
+            $options[] = [
+                'name' => (string)$name,
+                'value' => (string)$value
+            ];
+        }
+
+        // 2. Preparar el payload para core_course_create_modules
+        // Nota: 'section' en este WS suele referirse al número de orden (0, 1, 2...)
+        $modulePayload = [
+            'courseid'   => (int)$courseId,
+            'modulename' => (string)$modname,
+            'section'    => (int)$sectionId,
+            'visible'    => 1,
+            'options'    => $options
+        ];
+
+        // 3. Ejecutar la llamada a Moodle
+        $response = $this->call('core_course_create_modules', [
+            'modules' => [$modulePayload]
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+
+        // 4. Procesar respuesta
+        if (!empty($response) && is_array($response) && isset($response[0]['coursemodule'])) {
+            return [
+                'success'  => true,
+                'cmid'     => $response[0]['coursemodule'], // Course Module ID (Para la URL)
+                'instance' => $response[0]['instance'],     // ID de la instancia (ID de la Tarea/Foro)
+            ];
+        }
+
+        // Manejo de excepciones de Moodle
+        $errorMsg = isset($response['message']) ? $response['message'] : json_encode($response);
+        return [
+            'success' => false,
+            'error'   => $errorMsg
+        ];
+    }
 }
