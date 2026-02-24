@@ -631,7 +631,7 @@ class IntegracionController extends BaseApiController
 
             // Extraemos los valores del payload
             $courseid = $data['id_programacion']; // En este contexto es el ID del curso en Moodle
-            $sectionid = $data['id_seccion_moodle'];
+            $section = $data['section'];
             $modname = $data['modname'];
             $moodle_params = $data['moodle_params'];
 
@@ -644,7 +644,7 @@ class IntegracionController extends BaseApiController
                     $MOODLE_URL,
                     $MOODLE_TOKEN,
                     $courseid,
-                    $sectionid,
+                    $section,
                     $modname,
                     $moodle_params
                 );
