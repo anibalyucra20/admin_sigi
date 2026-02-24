@@ -484,62 +484,60 @@ class MoodleService
     /**
      * Crea un módulo en Moodle asegurando la existencia de la sección y el rastreo de finalización.
      */
-    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionNumber, $modname, $params)
     {
         $realCourseId = 0;
-
-        // --- BUSQUEDA AVANZADA DEL CURSO ---
-        // Intentamos por IDNumber
+        // 1. Resolver ID del Curso
         $search = $this->call('core_course_get_courses_by_field', [
             'field' => 'idnumber',
             'value' => (string)$courseIdOrNumber
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (empty($search['courses'])) {
-            // Si falló, intentamos por Shortname
-            $search = $this->call('core_course_get_courses_by_field', [
-                'field' => 'shortname',
-                'value' => (string)$courseIdOrNumber
-            ], $MOODLE_URL, $MOODLE_TOKEN);
-        }
-
         if (!empty($search['courses'][0]['id'])) {
             $realCourseId = (int)$search['courses'][0]['id'];
         } else {
-            // Si sigue siendo 0 y es numérico, lo usamos directamente
-            if (is_numeric($courseIdOrNumber)) {
-                $realCourseId = (int)$courseIdOrNumber;
-            } else {
-                return ['success' => false, 'error' => "API Master: No se encontró el curso '$courseIdOrNumber' ni por IDNumber ni por Shortname."];
+            return ['success' => false, 'error' => "Curso no encontrado: $courseIdOrNumber"];
+        }
+
+        // 2. VERIFICAR SI LA SECCIÓN EXISTE REALMENTE
+        $contents = $this->call('core_course_get_contents', ['courseid' => $realCourseId], $MOODLE_URL, $MOODLE_TOKEN);
+        $sectionExists = false;
+        foreach ($contents as $sec) {
+            if ((int)$sec['section'] === (int)$sectionNumber) {
+                $sectionExists = true;
+                break;
             }
         }
 
-        // --- PREPARAR ACTIVIDAD ---
-        // Aseguramos que los campos básicos existan
-        if (!isset($params['name'])) $params['name'] = "Actividad SIGI";
-        if (!isset($params['intro'])) $params['intro'] = "";
+        // 3. SI LA SECCIÓN NO EXISTE, LA CREAMOS AL VUELO
+        if (!$sectionExists) {
+            $this->call('core_course_create_sections', [
+                'courseid' => $realCourseId,
+                'sectionnumbers' => [(int)$sectionNumber]
+            ], $MOODLE_URL, $MOODLE_TOKEN);
+        }
 
+        // 4. Preparar Opciones (Eliminamos idnumber si causa conflicto)
         $options = [];
         foreach ($params as $name => $value) {
             $options[] = ['name' => (string)$name, 'value' => (string)$value];
         }
 
-        // --- LLAMADA FINAL A MOODLE ---
+        // 5. Llamada final a Moodle
         $response = $this->call('core_course_create_modules', [
             'modules' => [[
                 'courseid'   => $realCourseId,
                 'modulename' => (string)$modname,
-                'section'    => (int)$sectionId,
+                'section'    => (int)$sectionNumber,
                 'visible'    => 1,
                 'options'    => $options
             ]]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // --- RESPUESTA CON DIAGNÓSTICO ---
         if (isset($response['exception'])) {
             return [
                 'success' => false,
-                'error' => "Moodle Error: " . $response['message'] . " (Causa: ID Curso Interno " . $realCourseId . ", Seccion " . $sectionId . ")"
+                'error' => "Moodle: " . $response['message'] . " (Sección intentada: " . $sectionNumber . ")"
             ];
         }
 
@@ -547,8 +545,7 @@ class MoodleService
             return [
                 'success'  => true,
                 'cmid'     => $response[0]['coursemodule'],
-                'instance' => $response[0]['instance'],
-                'debug_course_id' => $realCourseId
+                'instance' => $response[0]['instance']
             ];
         }
 
