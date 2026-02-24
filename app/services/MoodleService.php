@@ -486,45 +486,51 @@ class MoodleService
      */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionNumber, $modname, $params)
     {
-        // 1. Resolver ID (Ya sabemos que es 183)
-        $realCourseId = 183;
+        // 1. Resolver ID del Curso
+        $search = $this->call('core_course_get_courses_by_field', [
+            'field' => 'idnumber',
+            'value' => (string)$courseIdOrNumber
+        ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 2. FORZAMOS UNA TAREA SIMPLE (Eliminamos parámetros complejos)
-        // Usamos 'assign' porque es el módulo más estable de Moodle
-        $testModName = 'assign';
-        $options = [
-            ['name' => 'name', 'value' => 'Prueba de Conexión SIGI'],
-            ['name' => 'intro', 'value' => 'Si ves esto, la API funciona perfectamente.'],
-            ['name' => 'introformat', 'value' => '1']
-        ];
+        $realCourseId = !empty($search['courses'][0]['id']) ? (int)$search['courses'][0]['id'] : (is_numeric($courseIdOrNumber) ? (int)$courseIdOrNumber : 0);
+        if ($realCourseId === 0) return ['success' => false, 'error' => "Curso no encontrado."];
 
-        // 3. Intento de creación
+        // 2. OBTENER SECCIONES REALES PARA DIAGNÓSTICO
+        $contents = $this->call('core_course_get_contents', ['courseid' => $realCourseId], $MOODLE_URL, $MOODLE_TOKEN);
+        $secciones_disponibles = [];
+        foreach ($contents as $s) {
+            $secciones_disponibles[] = $s['section'];
+        }
+
+        // 3. Formatear Opciones
+        $options = [];
+        foreach ($params as $name => $value) {
+            $options[] = ['name' => (string)$name, 'value' => (string)$value];
+        }
+
+        // 4. Llamada a Moodle
         $response = $this->call('core_course_create_modules', [
             'modules' => [[
                 'courseid'   => $realCourseId,
-                'modulename' => $testModName,
+                'modulename' => (string)$modname,
                 'section'    => (int)$sectionNumber,
                 'visible'    => 1,
                 'options'    => $options
             ]]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 4. Diagnóstico de respuesta
         if (isset($response['exception'])) {
+            $lista = implode(', ', $secciones_disponibles);
             return [
                 'success' => false,
-                'error' => "Moodle rechazó incluso la Tarea: " . $response['message'] . " (Sección: $sectionNumber)"
+                'error' => "Moodle: " . $response['message'] . ". Secciones en BD: [$lista]. Intentada: $sectionNumber. Curso: $realCourseId"
             ];
         }
 
         if (!empty($response[0]['coursemodule'])) {
-            return [
-                'success' => true,
-                'cmid' => $response[0]['coursemodule'],
-                'message' => "¡LO LOGRAMOS! El problema era el tipo de módulo (Libro). Se creó una Tarea correctamente."
-            ];
+            return ['success' => true, 'cmid' => $response[0]['coursemodule'], 'instance' => $response[0]['instance']];
         }
 
-        return ['success' => false, 'error' => "Respuesta extraña: " . json_encode($response)];
+        return ['success' => false, 'error' => "Error: " . json_encode($response)];
     }
 }
