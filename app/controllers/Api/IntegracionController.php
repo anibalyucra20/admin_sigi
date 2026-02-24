@@ -634,8 +634,8 @@ class IntegracionController extends BaseApiController
             $section = $data['section'];
             $modname = $data['modname'];
             $moodle_params = $data['moodle_params'];
-            $this->json($data);
-            /*try {
+            //$this->json($data);
+            try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
@@ -672,7 +672,7 @@ class IntegracionController extends BaseApiController
                     'success' => false,
                     'message' => 'Excepción en API Master: ' . $e->getMessage()
                 ]);
-            }*/
+            }
         } else {
             $this->json([
                 'success' => false,
