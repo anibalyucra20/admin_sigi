@@ -483,9 +483,16 @@ class MoodleService
      */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
     {
+
         // 1. INTELIGENCIA DE ID: Si recibimos un string (ej: PROG_749), buscamos el ID numérico real
         $realCourseId = 0;
         if (!is_numeric($courseIdOrNumber)) {
+
+            // DIAGNÓSTICO TEMPORAL: Ver qué estamos enviando exactamente a Moodle
+            // Puedes ver esto en el log de errores de tu servidor (error_log)
+            //error_log("SIGI-DEBUG: Creando modulo en Curso: " . $realCourseId . " | Seccion: " . $sectionId . " | Tipo: " . $modname);
+            return [$courseIdOrNumber, $sectionId, $modname, $params];
+
             $courseSearch = $this->call('core_course_get_courses_by_field', [
                 'field' => 'idnumber',
                 'value' => (string)$courseIdOrNumber
