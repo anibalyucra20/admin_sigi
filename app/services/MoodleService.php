@@ -484,117 +484,138 @@ class MoodleService
     /**
      * Crea un módulo en Moodle asegurando la existencia de la sección y el rastreo de finalización.
      */
-    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionNumberOrId, $modname, $params)
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionInput, $modname, $params)
     {
-        // 1) Resolver ID real del curso
-        $search = $this->call('core_course_get_courses_by_field', [
-            'field' => 'idnumber',
-            'value' => (string)$courseIdOrNumber
-        ], $MOODLE_URL, $MOODLE_TOKEN);
+        // 1) Resolver ID REAL del curso (acepta idnumber tipo "PROG_123" o courseid numérico)
+        $realCourseId = 0;
 
-        $realCourseId = !empty($search['courses'][0]['id'])
-            ? (int)$search['courses'][0]['id']
-            : (is_numeric($courseIdOrNumber) ? (int)$courseIdOrNumber : 0);
+        // Si parece idnumber (ej: PROG_123) intentamos buscar por idnumber
+        if (!is_numeric($courseIdOrNumber)) {
+            $search = $this->call('core_course_get_courses_by_field', [
+                'field' => 'idnumber',
+                'value' => (string)$courseIdOrNumber
+            ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if ($realCourseId === 0) {
-            return ['success' => false, 'error' => "Curso no encontrado (courseIdOrNumber={$courseIdOrNumber})."];
+            if (!empty($search['courses'][0]['id'])) {
+                $realCourseId = (int)$search['courses'][0]['id'];
+            }
+        } else {
+            // Si es numérico lo tomamos como ID del curso directamente
+            $realCourseId = (int)$courseIdOrNumber;
         }
 
-        // 2) Traer secciones reales del curso (para:
-        //    - validar
-        //    - mapear sectionId -> sectionNumber)
+        if ($realCourseId <= 0) {
+            return ['success' => false, 'error' => 'Curso no encontrado.'];
+        }
+
+        // 2) Obtener secciones del curso para normalizar section
         $contents = $this->call('core_course_get_contents', [
             'courseid' => $realCourseId
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (!is_array($contents) || isset($contents['exception']) || isset($contents['errorcode'])) {
+        if (is_array($contents) && isset($contents['exception'])) {
             return [
                 'success' => false,
-                'error' => "No se pudo obtener contenidos del curso para validar secciones: " . json_encode($contents)
+                'error' => 'Moodle: ' . ($contents['message'] ?? 'Error obteniendo contenidos del curso.')
             ];
         }
 
-        // Mapas:
-        // - $sectionNumbers: lista de section numbers (0,1,2...)
-        // - $idToNumber: map section internal id -> section number (899 -> 1)
+        // 3) Mapear: section_number <-> section_id (interno)
         $sectionNumbers = [];
-        $idToNumber = [];
-
-        foreach ($contents as $s) {
-            if (isset($s['section'])) {
-                $sectionNumbers[] = (int)$s['section'];
+        $mapSectionIdToNumber = []; // [id => sectionNumber]
+        foreach ($contents as $sec) {
+            // En core_course_get_contents, típicamente:
+            // - $sec['section'] = número de sección (0,1,2,...)
+            // - $sec['id']      = id interno del registro course_sections
+            if (isset($sec['section'])) {
+                $sectionNumbers[] = (int)$sec['section'];
             }
-            if (isset($s['id']) && isset($s['section'])) {
-                $idToNumber[(int)$s['id']] = (int)$s['section'];
+            if (isset($sec['id'], $sec['section'])) {
+                $mapSectionIdToNumber[(int)$sec['id']] = (int)$sec['section'];
             }
         }
 
-        // 3) Normalizar sección: si te llega 899 (id interno),
-        //    lo convertimos a 1 (section number).
-        $sectionToUse = (int)$sectionNumberOrId;
+        $sectionNumbers = array_values(array_unique($sectionNumbers));
+        sort($sectionNumbers);
 
-        $isValidNumber = in_array($sectionToUse, $sectionNumbers, true);
-        if (!$isValidNumber && isset($idToNumber[$sectionToUse])) {
-            // Era un ID interno de sección; lo convertimos
-            $sectionToUse = $idToNumber[$sectionToUse];
-            $isValidNumber = true;
+        // 4) Normalizar el section recibido:
+        //    - si viene 1,2,3 => ya es number
+        //    - si viene 899 => probablemente es section_id => convertir a number
+        $sectionInputInt = is_numeric($sectionInput) ? (int)$sectionInput : 0;
+
+        $sectionToUse = null;
+
+        // Caso A: ya es un section number válido
+        if (in_array($sectionInputInt, $sectionNumbers, true)) {
+            $sectionToUse = $sectionInputInt;
+        } else {
+            // Caso B: podría ser section_id interno -> convertirlo
+            if (isset($mapSectionIdToNumber[$sectionInputInt])) {
+                $sectionToUse = $mapSectionIdToNumber[$sectionInputInt];
+            }
         }
 
-        if (!$isValidNumber) {
-            return [
-                'success' => false,
-                'error' => "Sección inválida. Secciones en curso (numbers): [" . implode(', ', $sectionNumbers) . "]. " .
-                    "Recibida: {$sectionNumberOrId}. Curso: {$realCourseId}"
-            ];
+        // Fallback seguro
+        if ($sectionToUse === null) {
+            // Si existe la 1 úsala, si no usa 0, si no usa la primera disponible
+            if (in_array(1, $sectionNumbers, true)) {
+                $sectionToUse = 1;
+            } elseif (in_array(0, $sectionNumbers, true)) {
+                $sectionToUse = 0;
+            } else {
+                $sectionToUse = $sectionNumbers[0] ?? 0;
+            }
         }
 
-        // 4) Formatear opciones
-        // Moodle espera options como array de [name,value]
+        // 5) Formatear options (core_course_create_modules exige lista name/value)
         $options = [];
         if (is_array($params)) {
             foreach ($params as $name => $value) {
-                // Moodle requiere strings
+                // Moodle espera strings en la mayoría de casos
                 if (is_bool($value)) $value = $value ? '1' : '0';
                 if (is_null($value)) $value = '';
                 $options[] = ['name' => (string)$name, 'value' => (string)$value];
             }
         }
 
-        // 5) Crear módulo
+        // 6) Crear módulo
         $response = $this->call('core_course_create_modules', [
             'modules' => [[
                 'courseid'   => $realCourseId,
                 'modulename' => (string)$modname,
-                'section'    => $sectionToUse, // ✅ YA ES section number (0,1,2..)
+                'section'    => (int)$sectionToUse, // <- SIEMPRE section number
                 'visible'    => 1,
                 'options'    => $options
             ]]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 6) Errores Moodle
-        if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
+        // 7) Manejo de error (con diagnóstico)
+        if (is_array($response) && isset($response['exception'])) {
+            $listaNums = implode(', ', $sectionNumbers);
+            $extra = "Secciones (numbers): [$listaNums]. Recibida: {$sectionInputInt}, usada: {$sectionToUse}. Curso: {$realCourseId}";
             return [
                 'success' => false,
-                'error' => "Moodle: " . ($response['message'] ?? json_encode($response)) .
-                    ". Secciones (numbers): [" . implode(', ', $sectionNumbers) . "]" .
-                    ". Recibida: {$sectionNumberOrId}, usada: {$sectionToUse}. Curso: {$realCourseId}"
+                'error' => "Moodle: " . ($response['message'] ?? 'Error desconocido') . ". " . $extra,
+                'raw' => $response
             ];
         }
 
-        // 7) OK
+        // 8) Éxito
         if (!empty($response[0]['coursemodule'])) {
             return [
                 'success'  => true,
                 'cmid'     => (int)$response[0]['coursemodule'],
-                'instance' => (int)$response[0]['instance'],
-                // algunos moodles no devuelven gradeitemid aquí; depende
-                'gradeitemid' => $response[0]['gradeitemid'] ?? null
+                'instance' => (int)($response[0]['instance'] ?? 0),
+                // Moodle a veces devuelve gradeitemid dependiendo del módulo / versión
+                'gradeitemid' => isset($response[0]['gradeitemid']) ? (int)$response[0]['gradeitemid'] : null,
+                'section_used' => (int)$sectionToUse
             ];
         }
 
         return [
             'success' => false,
-            'error' => "Respuesta inesperada Moodle: " . json_encode($response)
+            'error' => 'Respuesta inesperada de Moodle: ' . json_encode($response),
+            'raw' => $response
         ];
     }
 }
