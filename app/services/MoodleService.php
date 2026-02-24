@@ -486,79 +486,72 @@ class MoodleService
      */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
     {
-        // 1. Resolver ID numérico del curso si llega como IDNumber (ej: PROG_749)
         $realCourseId = 0;
-        if (!is_numeric($courseIdOrNumber)) {
-            $courseSearch = $this->call('core_course_get_courses_by_field', [
-                'field' => 'idnumber',
+
+        // --- BUSQUEDA AVANZADA DEL CURSO ---
+        // Intentamos por IDNumber
+        $search = $this->call('core_course_get_courses_by_field', [
+            'field' => 'idnumber',
+            'value' => (string)$courseIdOrNumber
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+
+        if (empty($search['courses'])) {
+            // Si falló, intentamos por Shortname
+            $search = $this->call('core_course_get_courses_by_field', [
+                'field' => 'shortname',
                 'value' => (string)$courseIdOrNumber
             ], $MOODLE_URL, $MOODLE_TOKEN);
-
-            if (!empty($courseSearch['courses'][0]['id'])) {
-                $realCourseId = (int)$courseSearch['courses'][0]['id'];
-            } else {
-                return ['success' => false, 'error' => "Curso no encontrado con IDNumber: $courseIdOrNumber"];
-            }
-        } else {
-            $realCourseId = (int)$courseIdOrNumber;
         }
 
-        // --- SOLUCIÓN AL ERROR invalidrecordunknown ---
-        // Forzamos al curso a tener suficientes secciones y habilitar el rastreo de finalización
-        // mediante una actualización rápida antes de intentar crear el módulo.
-        $this->call('core_course_update_courses', [
-            'courses' => [[
-                'id' => $realCourseId,
-                'enablecompletion' => 1, // Habilita rastreo global en el curso
-                'courseformatoptions' => [
-                    ['name' => 'numsections', 'value' => (int)$sectionId] // Asegura que existan las N secciones
-                ]
-            ]]
-        ], $MOODLE_URL, $MOODLE_TOKEN);
-        // ----------------------------------------------
+        if (!empty($search['courses'][0]['id'])) {
+            $realCourseId = (int)$search['courses'][0]['id'];
+        } else {
+            // Si sigue siendo 0 y es numérico, lo usamos directamente
+            if (is_numeric($courseIdOrNumber)) {
+                $realCourseId = (int)$courseIdOrNumber;
+            } else {
+                return ['success' => false, 'error' => "API Master: No se encontró el curso '$courseIdOrNumber' ni por IDNumber ni por Shortname."];
+            }
+        }
 
-        // 2. Convertir el array de parámetros al formato "options" (name/value) que exige Moodle
+        // --- PREPARAR ACTIVIDAD ---
+        // Aseguramos que los campos básicos existan
+        if (!isset($params['name'])) $params['name'] = "Actividad SIGI";
+        if (!isset($params['intro'])) $params['intro'] = "";
+
         $options = [];
         foreach ($params as $name => $value) {
-            $options[] = [
-                'name' => (string)$name,
-                'value' => (string)$value
-            ];
+            $options[] = ['name' => (string)$name, 'value' => (string)$value];
         }
 
-        // 3. Preparar el envío del módulo
-        $modulePayload = [
-            'courseid'   => $realCourseId,
-            'modulename' => (string)$modname,
-            'section'    => (int)$sectionId, // Número de secuencia (1, 2, 3...)
-            'visible'    => 1,
-            'options'    => $options
-        ];
-
-        // 4. Llamada final a Moodle
+        // --- LLAMADA FINAL A MOODLE ---
         $response = $this->call('core_course_create_modules', [
-            'modules' => [$modulePayload]
+            'modules' => [[
+                'courseid'   => $realCourseId,
+                'modulename' => (string)$modname,
+                'section'    => (int)$sectionId,
+                'visible'    => 1,
+                'options'    => $options
+            ]]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 5. Procesar respuesta y capturar errores detallados
+        // --- RESPUESTA CON DIAGNÓSTICO ---
         if (isset($response['exception'])) {
             return [
                 'success' => false,
-                'error' => "Error Moodle: " . $response['message'] . " (Código: " . $response['errorcode'] . ")"
+                'error' => "Moodle Error: " . $response['message'] . " (Causa: ID Curso Interno " . $realCourseId . ", Seccion " . $sectionId . ")"
             ];
         }
 
-        if (!empty($response) && is_array($response) && isset($response[0]['coursemodule'])) {
+        if (!empty($response[0]['coursemodule'])) {
             return [
                 'success'  => true,
                 'cmid'     => $response[0]['coursemodule'],
                 'instance' => $response[0]['instance'],
+                'debug_course_id' => $realCourseId
             ];
         }
 
-        return [
-            'success' => false,
-            'error' => "Respuesta inesperada de Moodle: " . json_encode($response)
-        ];
+        return ['success' => false, 'error' => "Error desconocido: " . json_encode($response)];
     }
 }
