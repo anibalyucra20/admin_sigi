@@ -483,16 +483,9 @@ class MoodleService
      */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
     {
-
-        // 1. INTELIGENCIA DE ID: Si recibimos un string (ej: PROG_749), buscamos el ID numérico real
+        // 1. Resolver ID del Curso
         $realCourseId = 0;
         if (!is_numeric($courseIdOrNumber)) {
-
-            // DIAGNÓSTICO TEMPORAL: Ver qué estamos enviando exactamente a Moodle
-            // Puedes ver esto en el log de errores de tu servidor (error_log)
-            //error_log("SIGI-DEBUG: Creando modulo en Curso: " . $realCourseId . " | Seccion: " . $sectionId . " | Tipo: " . $modname);
-            return [$courseIdOrNumber, $sectionId, $modname, $params];
-
             $courseSearch = $this->call('core_course_get_courses_by_field', [
                 'field' => 'idnumber',
                 'value' => (string)$courseIdOrNumber
@@ -501,33 +494,41 @@ class MoodleService
             if (!empty($courseSearch['courses'][0]['id'])) {
                 $realCourseId = (int)$courseSearch['courses'][0]['id'];
             } else {
-                return ['success' => false, 'error' => "No se encontró el curso con IDNumber: $courseIdOrNumber"];
+                return ['success' => false, 'error' => "Curso no encontrado: $courseIdOrNumber"];
             }
         } else {
             $realCourseId = (int)$courseIdOrNumber;
         }
 
-        // 2. Convertir opciones al formato Moodle
+        // 2. Formatear Opciones para Moodle (Importante: nombre/valor)
         $options = [];
-        foreach ($params as $name => $value) {
-            $options[] = ['name' => (string)$name, 'value' => (string)$value];
+        foreach ($params as $key => $val) {
+            $options[] = ['name' => (string)$key, 'value' => (string)$val];
         }
 
-        // 3. Preparar payload
+        // 3. Payload
         $modulePayload = [
             'courseid'   => $realCourseId,
             'modulename' => (string)$modname,
-            'section'    => (int)$sectionId, // Número de secuencia (1, 2, 3...)
+            'section'    => (int)$sectionId,
             'visible'    => 1,
             'options'    => $options
         ];
 
-        // 4. Llamada a Moodle
+        // 4. Llamada técnica
         $response = $this->call('core_course_create_modules', [
             'modules' => [$modulePayload]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        if (!empty($response) && is_array($response) && isset($response[0]['coursemodule'])) {
+        // --- MANEJO DE ERRORES DETALLADO ---
+        if (isset($response['exception'])) {
+            return [
+                'success' => false,
+                'error' => "Excepción Moodle: " . $response['message'] . " (Código: " . $response['errorcode'] . ")"
+            ];
+        }
+
+        if (isset($response[0]['coursemodule'])) {
             return [
                 'success'  => true,
                 'cmid'     => $response[0]['coursemodule'],
@@ -535,7 +536,6 @@ class MoodleService
             ];
         }
 
-        $errorMsg = isset($response['message']) ? $response['message'] : json_encode($response);
-        return ['success' => false, 'error' => $errorMsg];
+        return ['success' => false, 'error' => "Respuesta inesperada: " . json_encode($response)];
     }
 }

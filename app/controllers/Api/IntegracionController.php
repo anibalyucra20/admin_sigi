@@ -648,8 +648,8 @@ class IntegracionController extends BaseApiController
                     $modname,
                     $moodle_params
                 );
-                $this->json($resultado);
-                /*if ($resultado['success']) {
+                //$this->json($resultado);
+                if ($resultado['success']) {
                     // Si Moodle devolvió éxito, retornamos el cmid y la url armada
                     $this->json([
                         'success' => true,
@@ -666,7 +666,7 @@ class IntegracionController extends BaseApiController
                         'success' => false,
                         'message' => 'Moodle rechazó la creación: ' . ($resultado['error'] ?? 'Error desconocido')
                     ]);
-                }*/
+                }
             } catch (\Exception $e) {
                 $this->json([
                     'success' => false,
