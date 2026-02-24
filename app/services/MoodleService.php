@@ -481,47 +481,54 @@ class MoodleService
      * @param array $params Arreglo plano de configuración.
      * @return array [success => bool, cmid => int, instance => int, error => string]
      */
-    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseId, $sectionId, $modname, $params)
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseIdOrNumber, $sectionId, $modname, $params)
     {
-        // 1. Convertir el arreglo plano de SIGI al formato "options" que exige Moodle
-        $options = [];
-        foreach ($params as $name => $value) {
-            // Moodle requiere que todos los valores en options sean strings
-            $options[] = [
-                'name' => (string)$name,
-                'value' => (string)$value
-            ];
+        // 1. INTELIGENCIA DE ID: Si recibimos un string (ej: PROG_749), buscamos el ID numérico real
+        $realCourseId = 0;
+        if (!is_numeric($courseIdOrNumber)) {
+            $courseSearch = $this->call('core_course_get_courses_by_field', [
+                'field' => 'idnumber',
+                'value' => (string)$courseIdOrNumber
+            ], $MOODLE_URL, $MOODLE_TOKEN);
+
+            if (!empty($courseSearch['courses'][0]['id'])) {
+                $realCourseId = (int)$courseSearch['courses'][0]['id'];
+            } else {
+                return ['success' => false, 'error' => "No se encontró el curso con IDNumber: $courseIdOrNumber"];
+            }
+        } else {
+            $realCourseId = (int)$courseIdOrNumber;
         }
 
-        // 2. Preparar el payload para core_course_create_modules
-        // Nota: 'section' en este WS suele referirse al número de orden (0, 1, 2...)
+        // 2. Convertir opciones al formato Moodle
+        $options = [];
+        foreach ($params as $name => $value) {
+            $options[] = ['name' => (string)$name, 'value' => (string)$value];
+        }
+
+        // 3. Preparar payload
         $modulePayload = [
-            'courseid'   => (int)$courseId,
+            'courseid'   => $realCourseId,
             'modulename' => (string)$modname,
-            'section'    => (int)$sectionId,
+            'section'    => (int)$sectionId, // Número de secuencia (1, 2, 3...)
             'visible'    => 1,
             'options'    => $options
         ];
 
-        // 3. Ejecutar la llamada a Moodle
+        // 4. Llamada a Moodle
         $response = $this->call('core_course_create_modules', [
             'modules' => [$modulePayload]
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 4. Procesar respuesta
         if (!empty($response) && is_array($response) && isset($response[0]['coursemodule'])) {
             return [
                 'success'  => true,
-                'cmid'     => $response[0]['coursemodule'], // Course Module ID (Para la URL)
-                'instance' => $response[0]['instance'],     // ID de la instancia (ID de la Tarea/Foro)
+                'cmid'     => $response[0]['coursemodule'],
+                'instance' => $response[0]['instance'],
             ];
         }
 
-        // Manejo de excepciones de Moodle
         $errorMsg = isset($response['message']) ? $response['message'] : json_encode($response);
-        return [
-            'success' => false,
-            'error'   => $errorMsg
-        ];
+        return ['success' => false, 'error' => $errorMsg];
     }
 }
