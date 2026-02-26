@@ -660,10 +660,13 @@ class IntegracionController extends BaseApiController
                 if ($resultado['success']) {
                     $this->json([
                         'success' => true,
-                        'ok' => true,
-                        'cmid' => $resultado['cmid'],
-                        'instance' => $resultado['instance'],
-                        'url' => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
+                        'ok'      => true,
+                        'message' => 'Módulo creado exitosamente',
+                        'data'    => [
+                            'cmid'     => $resultado['cmid'],
+                            'instance' => $resultado['instance'],
+                            'url'      => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
+                        ]
                     ]);
                 } else {
                     $this->json([

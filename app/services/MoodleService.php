@@ -500,8 +500,8 @@ class MoodleService
         if (isset($response['success']) && $response['success'] === true) {
             return [
                 'success'  => true,
-                'cmid'     => $response['cmid'],
-                'instance' => $response['instance']
+                'cmid'     => $response['cmid'] ?? 0,
+                'instance' => $response['instance'] ?? 0
             ];
         }
 
