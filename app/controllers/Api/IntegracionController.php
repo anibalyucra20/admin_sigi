@@ -617,28 +617,32 @@ class IntegracionController extends BaseApiController
     //==================== function crear modulo 
     public function createModuleMoodle()
     {
-        // 1. Validar API Key
         $this->requireApiKey($this->endpointCreateModuleMoodle);
-
         $id_ies = $this->tenantId;
         $ies = $this->objIes->find($id_ies);
 
         if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
-            // 2. Leer datos del SIGI Local (JSON de php://input)
             $json_data = file_get_contents('php://input');
             $data = json_decode($json_data, true);
 
-            // Extraemos según los nombres que envía tu JS en la vista evaluar.php
-            $courseid = $data['courseid'];    // ID real de Moodle del curso
-            $section  = $data['section'];     // Número de sección (1, 2, 3...)
-            $modname  = $data['moodle_type']; // 'assign', 'quiz', etc.
-            $params   = $data['moodle_data']; // Arreglo con name, intro, duedate, etc.
+            // --- CORRECCIÓN DE MAPEADO AQUÍ ---
+            // Los datos vienen dentro de ['details'] según tu array
+            $details = $data['details'] ?? [];
 
-            /* try {
+            $courseid = $details['courseid'] ?? 0;
+            $section  = $details['section'] ?? 0;
+            $modname  = $details['modname'] ?? '';
+            $params   = $details['moodle_params'] ?? [];
+
+            if (!$courseid || !$modname) {
+                $this->json(['success' => false, 'message' => 'Datos incompletos en el payload']);
+                return;
+            }
+
+            try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
-                // 3. Llamar al Service para ejecutar la acción dinámica
                 $resultado = $this->serviceMoodle->createModule(
                     $MOODLE_URL,
                     $MOODLE_TOKEN,
@@ -651,27 +655,20 @@ class IntegracionController extends BaseApiController
                 if ($resultado['success']) {
                     $this->json([
                         'success' => true,
-                        'ok' => true, // Para compatibilidad con tu JS
-                        'message' => 'Módulo creado exitosamente en Moodle',
-                        'data' => [
-                            'cmid' => $resultado['cmid'],
-                            'instance' => $resultado['instance'],
-                            'url' => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
-                        ]
+                        'ok' => true,
+                        'cmid' => $resultado['cmid'],
+                        'instance' => $resultado['instance'],
+                        'url' => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
                     ]);
                 } else {
                     $this->json([
                         'success' => false,
-                        'ok' => false,
                         'message' => 'Moodle rechazó la creación: ' . ($resultado['error'] ?? 'Error desconocido')
                     ]);
                 }
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
-            }*/
-            $this->json(['success' => true, 'message' => $data]);
-        } else {
-            $this->json(['success' => false, 'message' => 'Integración no activa']);
+            }
         }
     }
 
