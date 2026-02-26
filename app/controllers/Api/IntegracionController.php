@@ -644,7 +644,7 @@ class IntegracionController extends BaseApiController
                 return;
             }
 
-            try {
+            /*try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
@@ -676,7 +676,8 @@ class IntegracionController extends BaseApiController
                 }
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
-            }
+            }*/
+            $this->json(['success' => true, 'data' => $data]);
         }
     }
 
