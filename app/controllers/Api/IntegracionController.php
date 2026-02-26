@@ -669,7 +669,7 @@ class IntegracionController extends BaseApiController
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
             }*/
-            $this->json(['success' => false, 'message' => $data]);
+            $this->json(['success' => true, 'message' => $data]);
         } else {
             $this->json(['success' => false, 'message' => 'Integración no activa']);
         }
