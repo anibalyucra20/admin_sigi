@@ -625,17 +625,22 @@ class IntegracionController extends BaseApiController
             $json_data = file_get_contents('php://input');
             $data = json_decode($json_data, true);
 
-            // --- CORRECCIÓN DE MAPEADO AQUÍ ---
-            // Los datos vienen dentro de ['details'] según tu array
-            $details = $data['details'] ?? [];
+            // --- BUSQUEDA ROBUSTA DE DATOS ---
+            $payload = $data['details'] ?? $data;
 
-            $courseid = $details['courseid'] ?? 0;
-            $section  = $details['section'] ?? 0;
-            $modname  = $details['modname'] ?? '';
-            $params   = $details['moodle_params'] ?? [];
+            // Mapeamos los nombres según el array que me pasaste
+            $courseid = $payload['id_programacion'] ?? $payload['courseid'] ?? 0;
+            $section  = $payload['section'] ?? 0;
+            $modname  = $payload['modname'] ?? $payload['moodle_type'] ?? '';
+            $params   = $payload['moodle_params'] ?? $payload['moodle_data'] ?? [];
 
+            // Validación de seguridad
             if (!$courseid || !$modname) {
-                $this->json(['success' => false, 'message' => 'Datos incompletos en el payload']);
+                $this->json([
+                    'success' => false,
+                    'message' => 'Datos incompletos en el payload',
+                    'debug_received' => $payload // Esto nos ayudará si vuelve a fallar
+                ]);
                 return;
             }
 
