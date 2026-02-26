@@ -471,11 +471,10 @@ class MoodleService
         return $modulos_finales;
     }
 
-    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseid, $section, $modname, $params)
+    public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseid, $sectionid, $modname, $params)
     {
-        // 1. Preparamos los customoptions para el plugin dinámico
         $customOptions = [];
-        $exclude = ['name', 'intro']; // Estos van como parámetros fijos en la función del plugin
+        $exclude = ['name', 'intro'];
 
         foreach ($params as $key => $value) {
             if (!in_array($key, $exclude)) {
@@ -486,28 +485,24 @@ class MoodleService
             }
         }
 
-        // 2. Llamamos a tu NUEVA función del plugin SIGIWS
+        // Llamada a la función con el nuevo parámetro sectionid
         $response = $this->call('local_sigiws_create_module', [
             'courseid'      => (int)$courseid,
-            'section'       => (int)$section,
+            'sectionid'     => (int)$sectionid, // <-- CAMBIO AQUÍ
             'modname'       => (string)$modname,
-            'name'          => (string)($params['name'] ?? 'Nueva Actividad'),
+            'name'          => (string)($params['name'] ?? 'Actividad SIGI'),
             'intro'         => (string)($params['intro'] ?? ''),
             'customoptions' => $customOptions
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
-        // 3. Retornamos la respuesta mapeada
         if (isset($response['success']) && $response['success'] === true) {
             return [
                 'success'  => true,
-                'cmid'     => $response['cmid'] ?? 0,
-                'instance' => $response['instance'] ?? 0
+                'cmid'     => $response['cmid'],
+                'instance' => $response['instance']
             ];
         }
 
-        return [
-            'success' => false,
-            'error'   => $response['warnings'][0] ?? $response['message'] ?? 'Error en WebService'
-        ];
+        return ['success' => false, 'error' => $response['warnings'][0] ?? 'Error WebService'];
     }
 }

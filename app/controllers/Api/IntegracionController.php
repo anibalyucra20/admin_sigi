@@ -630,7 +630,7 @@ class IntegracionController extends BaseApiController
 
             // Mapeamos los nombres según el array que me pasaste
             $courseid = $payload['id_programacion'] ?? $payload['courseid'] ?? 0;
-            $section  = $payload['section'] ?? 0;
+            $sectionid  = $payload['id_seccion_moodle'] ?? 0;
             $modname  = $payload['modname'] ?? $payload['moodle_type'] ?? '';
             $params   = $payload['moodle_params'] ?? $payload['moodle_data'] ?? [];
 
@@ -652,7 +652,7 @@ class IntegracionController extends BaseApiController
                     $MOODLE_URL,
                     $MOODLE_TOKEN,
                     $courseid,
-                    $section,
+                    $sectionid,
                     $modname,
                     $params
                 );
