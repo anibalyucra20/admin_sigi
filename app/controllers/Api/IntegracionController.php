@@ -634,7 +634,7 @@ class IntegracionController extends BaseApiController
             $modname  = $data['moodle_type']; // 'assign', 'quiz', etc.
             $params   = $data['moodle_data']; // Arreglo con name, intro, duedate, etc.
 
-            try {
+            /* try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
@@ -668,7 +668,8 @@ class IntegracionController extends BaseApiController
                 }
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
-            }
+            }*/
+            $this->json(['success' => false, 'message' => $data]);
         } else {
             $this->json(['success' => false, 'message' => 'Integración no activa']);
         }
