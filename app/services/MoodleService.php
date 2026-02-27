@@ -478,17 +478,21 @@ class MoodleService
 
         foreach ($params as $key => $value) {
             if (!in_array($key, $exclude)) {
+                // Validamos si el valor es un array (como en optiontext)
+                // Si es array, lo convertimos a JSON para que no se transforme en el string "Array"
+                $finalValue = is_array($value) ? json_encode($value) : (string)$value;
+
                 $customOptions[] = [
                     'name' => (string)$key,
-                    'value' => (string)$value
+                    'value' => $finalValue
                 ];
             }
         }
 
-        // Llamada a la función con el nuevo parámetro sectionid
+        // Llamada a la función con el parámetro sectionid
         $response = $this->call('local_sigiws_create_module', [
             'courseid'      => (int)$courseid,
-            'sectionid'     => (int)$sectionid, // <-- CAMBIO AQUÍ
+            'sectionid'     => (int)$sectionid,
             'modname'       => (string)$modname,
             'name'          => (string)($params['name'] ?? 'Actividad SIGI'),
             'intro'         => (string)($params['intro'] ?? ''),
