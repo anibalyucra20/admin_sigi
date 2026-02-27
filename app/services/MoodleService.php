@@ -528,4 +528,62 @@ class MoodleService
 
         return ['success' => false, 'error' => $response['warnings'][0] ?? 'Error WebService'];
     }
+
+
+
+    /**
+     * Sube un archivo al área de borradores de Moodle y devuelve el itemid.
+     * * @param string $rutaFisica Ruta completa del archivo en el servidor de SIGI.
+     * @param string $nombreArchivo Nombre que tendrá el archivo en Moodle (ej: 'clase1.zip').
+     * @return int|null El draftitemid generado o null si falla.
+     */
+    public function subirArchivoAMoodle($MOODLE_URL, $MOODLE_TOKEN, $rutaFisica, $nombreArchivo)
+    {
+        if (!file_exists($rutaFisica)) {
+            return null;
+        }
+
+        // 1. Convertir el contenido del archivo a Base64
+        $contenidoBinario = file_get_contents($rutaFisica);
+        $base64Content = base64_encode($contenidoBinario);
+
+        // 2. Configuración de la llamada al Web Service
+        $functionName = 'local_sigiws_upload_file';
+        $serverUrl = $MOODLE_URL . '/webservice/rest/server.php' .
+            '?wstoken=' . $MOODLE_TOKEN .
+            '&wsfunction=' . $functionName .
+            '&moodlewsrestformat=json';
+
+        // 3. Parámetros para la función local_sigiws_upload_file
+        $params = [
+            'filename'    => $nombreArchivo,
+            'filecontent' => $base64Content,
+            'itemid'      => 0 // 0 indica a Moodle que cree un área nueva
+        ];
+
+        // 4. Ejecución vía cURL
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $serverUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Ajustar según entorno
+
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return null;
+        }
+
+        $resultado = json_decode($response, true);
+
+        // 5. Validar respuesta
+        if (isset($resultado['success']) && $resultado['success'] === true) {
+            return (int)$resultado['itemid'];
+        }
+
+        return null;
+    }
 }

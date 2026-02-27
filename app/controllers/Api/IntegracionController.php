@@ -681,7 +681,67 @@ class IntegracionController extends BaseApiController
         }
     }
 
+    //===================== Subida de archivos a Draft Area de Moodle =====================
+    public function uploadFileMoodle()
+    {
+        // 1. Validar seguridad del endpoint
+        $this->requireApiKey("/api/integracion/uploadFileMoodle");
 
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            // 2. Verificar si se ha enviado un archivo
+            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+                $this->json([
+                    'success' => false,
+                    'message' => 'No se recibió un archivo válido o hubo un error en la subida'
+                ]);
+                return;
+            }
+
+            $file = $_FILES['file'];
+            // Usamos el nombre enviado por POST o el nombre original del archivo
+            $filename = $_POST['filename'] ?? $file['name'];
+
+            try {
+                $MOODLE_URL = $ies['MOODLE_URL'];
+                $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+                // 3. Llamar al servicio para procesar el Base64 y subirlo a Moodle
+                // Nota: Asegúrate de tener el método uploadFile implementado en MoodleService
+                $itemid = $this->serviceMoodle->subirArchivoAMoodle(
+                    $MOODLE_URL,
+                    $MOODLE_TOKEN,
+                    $file['tmp_name'],
+                    $filename
+                );
+
+                if ($itemid) {
+                    $this->json([
+                        'success' => true,
+                        'itemid'  => $itemid,
+                        'message' => 'Archivo subido correctamente al área de borrador'
+                    ]);
+                } else {
+                    $this->json([
+                        'success' => false,
+                        'message' => 'Moodle no devolvió un itemid válido'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->json([
+                    'success' => false,
+                    'message' => 'Excepción al subir archivo: ' . $e->getMessage()
+                ]);
+            }
+        } else {
+            $this->json([
+                'success' => false,
+                'message' => 'No cuenta con integración con Moodle activa'
+            ]);
+        }
+    }
 
     //=============================== FIN INTEGRACIONES ===============================
 }
