@@ -489,6 +489,25 @@ class MoodleService
             }
         }
 
+        // --- BLINDAJE DE SEGURIDAD PARA QUIZ ---
+        // Si es un cuestionario, nos aseguramos de que el campo 'password' viaje 
+        // al menos como una cadena vacía para evitar errores de base de datos (NOT NULL).
+        if ($modname === 'quiz') {
+            $hasPassword = false;
+            foreach ($customOptions as $option) {
+                if ($option['name'] === 'password') {
+                    $hasPassword = true;
+                    break;
+                }
+            }
+            if (!$hasPassword) {
+                $customOptions[] = [
+                    'name' => 'password',
+                    'value' => ''
+                ];
+            }
+        }
+
         // Llamada a la función con el parámetro sectionid
         $response = $this->call('local_sigiws_create_module', [
             'courseid'      => (int)$courseid,
