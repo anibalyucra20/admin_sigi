@@ -304,52 +304,88 @@ class LibraryController extends BaseApiController
     }
 
     /* ========== GET /api/library/items (propios + adoptados) ========== */
+    /* ========== GET /api/library/items (Paginación Completa) ========== */
     public function items()
     {
         $this->requireApiKey();
 
+        // 1. Parámetros de paginación y filtros
         $page = max(1, (int)($_GET['page'] ?? 1));
-        $per  = min(100, max(1, (int)($_GET['per_page'] ?? 20)));
+        $per  = min(100, max(1, (int)($_GET['per_page'] ?? 10)));
         $off  = ($page - 1) * $per;
 
-        $q = trim($_GET['search'] ?? '');
+        $q    = trim($_GET['search'] ?? '');
+        $tipo = trim($_GET['tipo'] ?? ''); // Capturamos el tipo si el frontend lo envía
 
-        // Un solo input: titulo, autor, temas_relacionados
+        // 2. Construcción de condiciones dinámicas
         $cond = [];
         $pars = [];
+        
         if ($q !== '') {
             $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
             $like = "%$q%";
-            $pars[] = $like;
-            $pars[] = $like;
-            $pars[] = $like;
+            array_push($pars, $like, $like, $like);
         }
+
+        if ($tipo !== '') {
+            $cond[] = "bl.tipo_libro = ?";
+            $pars[] = $tipo;
+        }
+
         $W = $cond ? (' AND ' . implode(' AND ', $cond)) : '';
 
-        $sql = "
-        SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
-          FROM biblioteca_libros bl
-         WHERE bl.id_ies = ? $W
-        UNION
-        SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
-          FROM biblioteca_vinculos v
-          JOIN biblioteca_libros bl ON bl.id = v.id_libro
-         WHERE v.id_ies = ? $W
-         ORDER BY 1 DESC
-         LIMIT " . (int)$off . ", " . (int)$per;
+        // 3. Consulta para obtener el TOTAL (Indispensable para la paginación numérica)
+        // Usamos una subconsulta con UNION para contar el universo total de libros únicos
+        $sqlCount = "
+            SELECT COUNT(*) 
+            FROM (
+                SELECT bl.id FROM biblioteca_libros bl WHERE bl.id_ies = ? $W
+                UNION
+                SELECT bl.id FROM biblioteca_vinculos v 
+                JOIN biblioteca_libros bl ON bl.id = v.id_libro WHERE v.id_ies = ? $W
+            ) AS total_universo";
 
-        // bind = [tenant, filtros..., tenant, filtros...]
-        $bind = array_merge([$this->tenantId], $pars, [$this->tenantId], $pars);
-
-        $st = $this->db->prepare($sql);
-        $i = 1;
-        foreach ($bind as $val) {
-            $st->bindValue($i++, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        $bindCount = array_merge([$this->tenantId], $pars, [$this->tenantId], $pars);
+        
+        $stCount = $this->db->prepare($sqlCount);
+        foreach ($bindCount as $i => $val) {
+            $stCount->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
-        $st->execute();
-        $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
-        $data = array_map([$this, 'mapRow'], $rows); // sin cfg
-        return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per]);
+        $stCount->execute();
+        $totalRecords = (int)$stCount->fetchColumn();
+
+        // 4. Consulta para obtener los DATOS de la página actual
+        $sqlData = "
+            SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+              FROM biblioteca_libros bl
+             WHERE bl.id_ies = ? $W
+            UNION
+            SELECT bl.id, bl.id_ies, bl.titulo, bl.autor, bl.isbn, bl.tipo_libro, bl.portada, bl.libro, bl.anio
+              FROM biblioteca_vinculos v
+              JOIN biblioteca_libros bl ON bl.id = v.id_libro
+             WHERE v.id_ies = ? $W
+             ORDER BY 1 DESC
+             LIMIT " . (int)$off . ", " . (int)$per;
+
+        $stData = $this->db->prepare($sqlData);
+        foreach ($bindCount as $i => $val) {
+            $stData->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+        }
+        $stData->execute();
+        
+        $rows = $stData->fetchAll(\PDO::FETCH_ASSOC);
+        $data = array_map([$this, 'mapRow'], $rows);
+
+        // 5. Respuesta estructurada para el SIGI
+        return $this->json([
+            'data' => $data,
+            'pagination' => [
+                'total_records' => $totalRecords,
+                'total_pages'   => ceil($totalRecords / $per),
+                'current_page'  => $page,
+                'per_page'      => $per
+            ]
+        ]);
     }
 
     /* ========== GET /api/library/search (global) ========== */
