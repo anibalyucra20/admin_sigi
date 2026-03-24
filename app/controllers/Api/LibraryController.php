@@ -320,7 +320,7 @@ class LibraryController extends BaseApiController
         // 2. Construcción de condiciones dinámicas
         $cond = [];
         $pars = [];
-        
+
         if ($q !== '') {
             $cond[] = "(bl.titulo LIKE ? OR bl.autor LIKE ? OR bl.temas_relacionados LIKE ?)";
             $like = "%$q%";
@@ -346,7 +346,7 @@ class LibraryController extends BaseApiController
             ) AS total_universo";
 
         $bindCount = array_merge([$this->tenantId], $pars, [$this->tenantId], $pars);
-        
+
         $stCount = $this->db->prepare($sqlCount);
         foreach ($bindCount as $i => $val) {
             $stCount->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
@@ -372,7 +372,7 @@ class LibraryController extends BaseApiController
             $stData->bindValue($i + 1, $val, is_int($val) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
         }
         $stData->execute();
-        
+
         $rows = $stData->fetchAll(\PDO::FETCH_ASSOC);
         $data = array_map([$this, 'mapRow'], $rows);
 
@@ -398,30 +398,53 @@ class LibraryController extends BaseApiController
         $off  = ($page - 1) * $per;
         $q    = trim($_GET['search'] ?? '');
 
-        $sql = "SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
-              FROM biblioteca_libros
-             WHERE 1=1";
-
+        // 1. Construir la condición WHERE (para reusarla en el COUNT y en el SELECT)
+        $where = " WHERE 1=1";
         if ($q !== '') {
-            $sql .= " AND (titulo LIKE :q1 OR autor LIKE :q2 OR temas_relacionados LIKE :q3)";
+            $where .= " AND (titulo LIKE :q1 OR autor LIKE :q2 OR temas_relacionados LIKE :q3)";
         }
 
-        $sql .= " ORDER BY id DESC LIMIT " . (int)$off . ", " . (int)$per;
-
-        $st = $this->db->prepare($sql);
-
+        // 2. CONTAR EL TOTAL (Sin LIMIT)
+        $sqlCount = "SELECT COUNT(*) FROM biblioteca_libros" . $where;
+        $stCount = $this->db->prepare($sqlCount);
         if ($q !== '') {
             $like = "%$q%";
+            $stCount->bindValue(':q1', $like, \PDO::PARAM_STR);
+            $stCount->bindValue(':q2', $like, \PDO::PARAM_STR);
+            $stCount->bindValue(':q3', $like, \PDO::PARAM_STR);
+        }
+        $stCount->execute();
+        $totalRecords = (int)$stCount->fetchColumn();
+
+        // 3. OBTENER LOS DATOS (Con LIMIT y OFFSET)
+        $sql = "SELECT id, id_ies, titulo, autor, isbn, tipo_libro, portada, libro, anio
+            FROM biblioteca_libros"
+            . $where
+            . " ORDER BY id DESC LIMIT " . (int)$off . ", " . (int)$per;
+
+        $st = $this->db->prepare($sql);
+        if ($q !== '') {
             $st->bindValue(':q1', $like, \PDO::PARAM_STR);
             $st->bindValue(':q2', $like, \PDO::PARAM_STR);
             $st->bindValue(':q3', $like, \PDO::PARAM_STR);
         }
-
         $st->execute();
         $rows = $st->fetchAll(\PDO::FETCH_ASSOC);
 
+        // 4. MAPEAR Y RESPONDER
         $data = array_map([$this, 'mapRow'], $rows);
-        return $this->json(['data' => $data, 'page' => $page, 'per_page' => $per], 200);
+
+        $totalPages = ($totalRecords > 0) ? ceil($totalRecords / $per) : 0;
+
+        return $this->json([
+            'data' => $data,
+            'pagination' => [
+                'total_records' => $totalRecords,
+                'total_pages'   => $totalPages,
+                'current_page'  => $page,
+                'per_page'      => $per
+            ]
+        ], 200);
     }
 
     /* ========== GET /api/library/show/{id} ========== */
