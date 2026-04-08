@@ -62,7 +62,7 @@ class MicrosoftService
     public function syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE)
     {
         $token = $this->getToken($id_ies);
-
+        $pass = $passwordPlano;
         if ($token['success']) {
             if ($tipo_usuario != 'ESTUDIANTE') {
                 $skuId = $MICROSOFT_SKU_ID_DOCENTE;
@@ -92,14 +92,15 @@ class MicrosoftService
             ];
 
             // Solo agregamos password si es CREACION o si enviaron uno nuevo
-            if ($passwordPlano != null) {
+            if ($passwordPlano != '' && $passwordPlano != null) {
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passwordPlano
                 ];
-            } elseif ($id_microsoft == null) {
+            } elseif ($id_microsoft == null ) {
                 // Si es usuario nuevo y no vino password, generar uno aleatorio
                 $passforMicrosoft = \Core\Auth::crearPassword(8);
+                $pass = $passforMicrosoft; // Para devolverlo al API
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passforMicrosoft
@@ -144,7 +145,7 @@ class MicrosoftService
                 if ($http_code == 204 || $http_code == 200) {
                     // Usuario actualizado, verificamos licencia por si acaso
                     $this->assignLicenseMicrosoft($id_microsoft, $skuId, $id_ies);
-                    return ['success' => true, 'id_microsoft' => $id_microsoft, 'msg' => 'Usuario actualizado'];
+                    return ['success' => true, 'id_microsoft' => $id_microsoft, 'msg' => 'Usuario actualizado', 'password' => $pass];
                 } else {
                     return ['success' => false, 'details' => isset($data['error']) ? $data['error']['message'] : 'Error update'];
                 }

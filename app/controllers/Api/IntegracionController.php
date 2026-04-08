@@ -89,10 +89,8 @@ class IntegracionController extends BaseApiController
                 $resultado = $this->serviceMicrosoft->syncUserMicrosoft($id_ies, $sigiId, $dni, $email, $nombres, $apellidos, $passwordPlano, $programa_estudios, $tipo_usuario, $estado, $MICROSOFT_SKU_ID_DOCENTE, $MICROSOFT_SKU_ID_ESTUDIANTE);
                 if ($resultado['success']) {
                     $responseApi['microsoft'] = $resultado;
-                    $responseApi['microsoft_pass'] = $passwordPlano;
                 } else {
                     $responseApi['microsoft'] = $resultado;
-                    $responseApi['microsoft_pass'] = $passwordPlano;
                 }
             } catch (\Exception $e) {
                 $responseApi['microsoft']['message_error'] = $e->getMessage();
