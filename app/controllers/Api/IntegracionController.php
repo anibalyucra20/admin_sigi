@@ -56,7 +56,13 @@ class IntegracionController extends BaseApiController
         $email = $dni . $MICROSOFT_SUFIJO_EMAIL;
         $nombres = $data['nombres'];
         $apellidos = $data['apellidos'];
-        $passwordPlano = $data['passwordPlano'] ?? \Core\Auth::crearPassword(8);
+        $cambio_password = $data['cambio_password'] ?? false;
+        if ($cambio_password) {
+            $passwordPlano = $data['passwordPlano'] ?? \Core\Auth::crearPassword(8);
+        }else {
+            $passwordPlano = null; // No se cambia la contraseña
+        }
+        
 
         $responseApi = [];
         //---------------------- INICIO INTEGRACION MOODLE --------------------------
