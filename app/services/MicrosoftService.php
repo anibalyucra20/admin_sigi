@@ -92,7 +92,7 @@ class MicrosoftService
             ];
 
             // Solo agregamos password si es CREACION o si enviaron uno nuevo
-            if ($passwordPlano != '' && $passwordPlano != null) {
+            if ($passwordPlano != null) {
                 $userPayload['passwordProfile'] = [
                     'forceChangePasswordNextSignIn' => false,
                     'password' => $passwordPlano
@@ -113,7 +113,12 @@ class MicrosoftService
                 // En PATCH no se envía userPrincipalName ni mailNickname a menos que sea necesario cambiarlos
                 unset($userPayload['mailNickname']);
                 unset($userPayload['userPrincipalName']);
-                unset($userPayload['passwordProfile']); // Generalmente no se cambia el pass en sync simple
+                if ($passwordPlano != null) {
+                    # code...
+                }else {
+                     unset($userPayload['passwordProfile']); // Generalmente no se cambia el pass en sync simple
+                }
+               
             } else {
                 $url = "https://graph.microsoft.com/v1.0/users"; // Sin barra al final
                 $method = "POST";
