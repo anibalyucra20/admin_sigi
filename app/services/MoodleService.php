@@ -658,6 +658,7 @@ class MoodleService
                 if (($item['itemtype'] ?? '') === 'mod') {
                     $itemsLimpio[] = [
                         'id'             => $item['id'], // moodle_grade_item_id
+                        'cmid'           => $item['cmid'] ?? 0, // <--- ¡ESTA ES LA LÍNEA CRÍTICA QUE FALTABA!
                         'gradeformatted' => $item['gradeformatted'] ?? '', // Nota visible (ej. '14.50' o '-')
                         'grademax'       => floatval($item['grademax'] ?? 20)
                     ];
