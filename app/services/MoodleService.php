@@ -586,4 +586,92 @@ class MoodleService
 
         return null;
     }
+
+
+
+    /**
+     * Obtiene los ítems de calificación de un curso en Moodle.
+     * Filtra la respuesta para devolver únicamente actividades evaluables reales.
+     */
+    public function getGradeItemsConfig($courseId, $MOODLE_URL, $MOODLE_TOKEN)
+    {
+        $params = ['courseid' => $courseId];
+        $resp = $this->call('core_grades_get_gradeitems', $params, $MOODLE_URL, $MOODLE_TOKEN);
+
+        if (isset($resp['exception']) || isset($resp['errorcode']) || !isset($resp['gradeItems'])) {
+            return [
+                'success' => false,
+                'message' => 'Error de comunicación con Moodle o curso sin calificaciones: ' . ($resp['message'] ?? '')
+            ];
+        }
+
+        $actividades = [];
+        foreach ($resp['gradeItems'] as $item) {
+            // 'mod' indica que es un módulo/actividad de curso (Foro, Tarea, Quiz)
+            // 'course' o 'category' son agregadores que no nos interesan
+            if ($item['itemtype'] === 'mod') {
+                $actividades[] = [
+                    'id'        => $item['id'], // Este es el moodle_grade_item_id
+                    'cmid'      => $item['iteminstance'], // Usualmente equivale al instance ID de la actividad
+                    'nombre'    => $item['itemname'],
+                    'modulo'    => $item['itemmodule'], // ej: 'assign', 'quiz'
+                    'max_grade' => floatval($item['grademax'] ?? 20)
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'data'    => $actividades
+        ];
+    }
+
+
+
+    /**
+     * Obtiene las notas procesadas de los estudiantes del Gradebook de Moodle.
+     * Limpia la respuesta para enviar solo los IDs y las notas, ahorrando ancho de banda.
+     */
+    public function getCourseGrades($courseId, $MOODLE_URL, $MOODLE_TOKEN)
+    {
+        $params = ['courseid' => $courseId];
+        $resp = $this->call('gradereport_user_get_grade_items', $params, $MOODLE_URL, $MOODLE_TOKEN);
+
+        if (isset($resp['exception']) || isset($resp['errorcode']) || empty($resp['usergrades'])) {
+            return [
+                'success' => false,
+                'message' => 'Fallo al obtener el libro de calificaciones: ' . ($resp['message'] ?? '')
+            ];
+        }
+
+        $calificacionesLimpias = [];
+
+        foreach ($resp['usergrades'] as $userGrade) {
+            // Ignoramos a los usuarios que no sean estudiantes (si Moodle los devuelve)
+            if (empty($userGrade['userid'])) continue;
+
+            $itemsLimpio = [];
+            foreach ($userGrade['gradeitems'] as $item) {
+                // Solo adjuntamos el item si pertenece a un módulo y tiene una nota válida o vacía.
+                // Excluimos las sumatorias totales del curso (itemtype = 'course')
+                if (($item['itemtype'] ?? '') === 'mod') {
+                    $itemsLimpio[] = [
+                        'id'             => $item['id'], // moodle_grade_item_id
+                        'gradeformatted' => $item['gradeformatted'] ?? '', // Nota visible (ej. '14.50' o '-')
+                        'grademax'       => floatval($item['grademax'] ?? 20)
+                    ];
+                }
+            }
+
+            $calificacionesLimpias[] = [
+                'userid'     => $userGrade['userid'],
+                'gradeitems' => $itemsLimpio
+            ];
+        }
+
+        return [
+            'success' => true,
+            'data'    => $calificacionesLimpias
+        ];
+    }
 }

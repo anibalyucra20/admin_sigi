@@ -25,6 +25,8 @@ class IntegracionController extends BaseApiController
     private $endpointDeleteProgramacionUd = "/api/consulta/delete_course_moodle/";
     private $endpointSyncMatriculaMoodle = "/api/consulta/sync_matricula_moodle/";
     private $endpointCreateModuleMoodle = "/api/integracion/createModuleMoodle";
+    private $endpointGetGradeItemsConfig = "/api/integracion/getGradeItemsConfig";
+    private $endpointGetCourseGrades = "/api/integracion/getCourseGrades";
     private $endpointUserMicrosoft = "/api/consulta/sync_user_integraciones/";
     private $endpointMeetMicrosoft = "/api/consulta/meet_microsoft/";
 
@@ -59,10 +61,10 @@ class IntegracionController extends BaseApiController
         $cambio_password = $data['cambio_password'] ?? false;
         if ($cambio_password) {
             $passwordPlano = $data['passwordPlano'] ?? \Core\Auth::crearPassword(8);
-        }else {
+        } else {
             $passwordPlano = null; // No se cambia la contraseña
         }
-        
+
 
         $responseApi = [];
         //---------------------- INICIO INTEGRACION MOODLE --------------------------
@@ -746,6 +748,100 @@ class IntegracionController extends BaseApiController
                 'success' => false,
                 'message' => 'No cuenta con integración con Moodle activa'
             ]);
+        }
+    }
+
+
+    /**
+     * Endpoint API Master: Extrae las actividades calificables de un curso de Moodle.
+     */
+    public function getGradeItemsConfig()
+    {
+        $this->requireApiKey($this->endpointGetGradeItemsConfig);
+
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        $courseid = $data['courseid'] ?? 0;
+
+        if ($courseid <= 0) {
+            $this->json(['success' => false, 'message' => 'courseid inválido.']);
+            return;
+        }
+
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            try {
+                $MOODLE_URL = $ies['MOODLE_URL'];
+                $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+                // Asumo que crearás este método en MoodleService
+                $resp = $this->serviceMoodle->getGradeItemsConfig($courseid, $MOODLE_URL, $MOODLE_TOKEN);
+
+                if ($resp['success']) {
+                    $this->json([
+                        'success' => true,
+                        'data' => $resp['data'] // Array limpio de actividades
+                    ]);
+                } else {
+                    $this->json([
+                        'success' => false,
+                        'details' => $resp['message'] ?? 'Error desconocido desde Moodle.'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->json(['success' => false, 'details' => 'Excepción: ' . $e->getMessage()]);
+            }
+        } else {
+            $this->json(['success' => false, 'details' => 'Integración Moodle desactivada para esta institución.']);
+        }
+    }
+
+
+    /**
+     * Endpoint API Master: Extrae las calificaciones procesadas del Gradebook.
+     */
+    public function getCourseGrades()
+    {
+        $this->requireApiKey($this->endpointGetCourseGrades);
+
+        $json_data = file_get_contents('php://input');
+        $data = json_decode($json_data, true);
+        $courseid = $data['courseid'] ?? 0;
+
+        if ($courseid <= 0) {
+            $this->json(['success' => false, 'message' => 'courseid inválido.']);
+            return;
+        }
+
+        $id_ies = $this->tenantId;
+        $ies = $this->objIes->find($id_ies);
+
+        if ($ies['MOODLE_SYNC_ACTIVE'] > 0) {
+            try {
+                $MOODLE_URL = $ies['MOODLE_URL'];
+                $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
+
+                // Asumo que crearás este método en MoodleService
+                $resp = $this->serviceMoodle->getCourseGrades($courseid, $MOODLE_URL, $MOODLE_TOKEN);
+
+                if ($resp['success']) {
+                    $this->json([
+                        'success' => true,
+                        'data' => $resp['data'] // Array de 'usergrades'
+                    ]);
+                } else {
+                    $this->json([
+                        'success' => false,
+                        'details' => $resp['message'] ?? 'Error desconocido desde Moodle.'
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->json(['success' => false, 'details' => 'Excepción: ' . $e->getMessage()]);
+            }
+        } else {
+            $this->json(['success' => false, 'details' => 'Integración Moodle desactivada para esta institución.']);
         }
     }
 
