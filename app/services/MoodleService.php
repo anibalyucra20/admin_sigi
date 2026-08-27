@@ -607,22 +607,23 @@ class MoodleService
 
         $actividades = [];
         foreach ($resp['gradeItems'] as $item) {
-            // 'mod' indica que es un módulo/actividad de curso (Foro, Tarea, Quiz)
-            // 'course' o 'category' son agregadores que no nos interesan
             if ($item['itemtype'] === 'mod') {
                 $actividades[] = [
-                    'id'        => $item['id'], // Este es el moodle_grade_item_id
-                    'cmid'      => $item['iteminstance'], // Usualmente equivale al instance ID de la actividad
+                    'id'        => $item['id'],
+                    'cmid'      => $item['iteminstance'],
                     'nombre'    => $item['itemname'],
-                    'modulo'    => $item['itemmodule'], // ej: 'assign', 'quiz'
+                    'modulo'    => $item['itemmodule'],
                     'max_grade' => floatval($item['grademax'] ?? 20)
                 ];
             }
         }
 
+        // --- INYECCIÓN DE DEBUG AQUÍ ---
+        // Vamos a devolver también lo que Moodle envió originalmente
         return [
             'success' => true,
-            'data'    => $actividades
+            'data'    => $actividades,
+            'debug_crudo_moodle' => $resp['gradeItems'] // ESTO ES LA CLAVE
         ];
     }
 
