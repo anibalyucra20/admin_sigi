@@ -777,7 +777,7 @@ class IntegracionController extends BaseApiController
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
                 // Asumo que crearás este método en MoodleService
-                $resp = $this->serviceMoodle->getGradeItemsConfig($courseid, $MOODLE_URL, $MOODLE_TOKEN);
+                $resp = $this->serviceMoodle->getActividadesDelCurso($courseid, $MOODLE_URL, $MOODLE_TOKEN);
 
                 if ($resp['success']) {
                     $this->json([

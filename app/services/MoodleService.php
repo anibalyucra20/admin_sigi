@@ -675,4 +675,45 @@ class MoodleService
             'data'    => $calificacionesLimpias
         ];
     }
+
+
+    /**
+     * Obtiene todas las actividades evaluables recorriendo la estructura real del curso.
+     * Soporta nativamente Módulos dentro de Sub-secciones.
+     */
+    public function getActividadesDelCurso($courseid, $MOODLE_URL, $MOODLE_TOKEN)
+    {
+        $curso_completo = $this->call('core_course_get_contents', ['courseid' => $courseid], $MOODLE_URL, $MOODLE_TOKEN);
+
+        if (isset($curso_completo['exception'])) {
+            return ['success' => false, 'message' => $curso_completo['message']];
+        }
+
+        $actividades = [];
+        // Módulos estándar que suelen ser calificables. (Añade más si usas otros plugins)
+        $modulosCalificables = ['assign', 'quiz', 'forum', 'h5pactivity', 'scorm', 'workshop', 'lesson'];
+
+        foreach ($curso_completo as $section) {
+            $sectionName = $section['name']; // Ej: "Indicador de logro 1" o "Subsección X"
+
+            if (!empty($section['modules'])) {
+                foreach ($section['modules'] as $modulo) {
+                    if (in_array($modulo['modname'], $modulosCalificables)) {
+                        $actividades[] = [
+                            'cmid'      => $modulo['id'],         // <-- EL DATO CLAVE (Course Module ID)
+                            'instance'  => $modulo['instance'] ?? 0,
+                            'nombre'    => $modulo['name'],
+                            'modulo'    => $modulo['modname'],
+                            'ubicacion' => $sectionName           // Ayuda al docente a saber dónde está
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'data'    => $actividades
+        ];
+    }
 }
