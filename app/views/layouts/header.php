@@ -94,11 +94,15 @@ endif;
                     <i class="mdi mdi-school"></i> Planes
                   </a>
                 </li>
-                <li class="nav-item">
-                  <a class="nav-link <?= strpos($_SERVER['REQUEST_URI'], '/biblioteca') !== false ? 'active' : '' ?>"
-                    href="<?= BASE_URL ?>/admin/biblioteca">
-                    <i class="mdi mdi-school"></i> Biblioteca
+                <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle arrow-none" href="#" id="nav-matriculas" role="button"
+                    data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="mdi mdi-school"></i> Datos Servicios <div class="arrow-down"></div>
                   </a>
+                  <div class="dropdown-menu" aria-labelledby="nav-matriculas">
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/biblioteca">Biblioteca</a>
+                    <a class="dropdown-item" href="<?= BASE_URL ?>/admin/rubricas">Rubricas</a>
+                  </div>
                 </li>
                 <li class="nav-item dropdown">
                   <a class="nav-link dropdown-toggle arrow-none" href="#" id="nav-matriculas" role="button"
