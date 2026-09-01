@@ -717,4 +717,105 @@ class MoodleService
             'data'    => $actividades
         ];
     }
+
+
+
+//===================== INYECCIÓN DE RÚBRICAS =====================
+
+    /**
+     * Paso 1: Obtener el ID de Contexto (Context ID) de un módulo en Moodle.
+     * Las rúbricas se asocian al Contexto, no al ID directo de la actividad.
+     * 
+     * @param string $MOODLE_URL
+     * @param string $MOODLE_TOKEN
+     * @param int $cmid ID del módulo del curso (Course Module ID)
+     * @return int|bool Retorna el Context ID o false si falla.
+     */
+    public function obtenerContextIdPorCmid($MOODLE_URL, $MOODLE_TOKEN, $cmid)
+    {
+        $response = $this->call('core_course_get_course_module', [
+            'cmid' => (int)$cmid
+        ], $MOODLE_URL, $MOODLE_TOKEN);
+
+        if (isset($response['cm']['contextid'])) {
+            return (int)$response['cm']['contextid'];
+        }
+
+        return false;
+    }
+
+    /**
+     * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones de Moodle.
+     * 
+     * @param string $MOODLE_URL
+     * @param string $MOODLE_TOKEN
+     * @param int $cmid ID del módulo del curso
+     * @param array $rubricData JSON decodificado con los criterios y niveles de SIGI
+     * @return array Array de respuesta con success y message
+     */
+    public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $cmid, $rubricData)
+    {
+        // 1. Obtener el contexto vital
+        $contextId = $this->obtenerContextIdPorCmid($MOODLE_URL, $MOODLE_TOKEN, $cmid);
+
+        if (!$contextId) {
+            return ['success' => false, 'message' => 'No se pudo obtener el contexto del módulo desde Moodle.'];
+        }
+
+        // 2. Mapeo estricto del JSON Local a la estructura del WS de Moodle
+        $rubric_criteria = [];
+        $sortOrderCrit = 1;
+
+        foreach ($rubricData['criterios'] as $criterio) {
+            $levels = [];
+            foreach ($criterio['niveles'] as $nivel) {
+                $levels[] = [
+                    'score' => (float)$nivel['score'],
+                    'definition' => trim($nivel['definition'] ?? '')
+                ];
+            }
+
+            $rubric_criteria[] = [
+                'sortorder' => $criterio['sortorder'] ?? $sortOrderCrit++,
+                'description' => trim($criterio['description'] ?? ''),
+                'levels' => $levels
+            ];
+        }
+
+        // 3. Empaquetar el Payload (Moodle es muy estricto con esta anidación)
+        $paramsMoodle = [
+            'areas' => [
+                [
+                    'contextid'    => $contextId,
+                    'component'    => 'mod_assign', // Normalmente las rúbricas van en Tareas
+                    'areaname'     => 'submissions',
+                    'activemethod' => 'rubric',
+                    'definitions'  => [
+                        [
+                            'method'      => 'rubric',
+                            'name'        => 'Rúbrica Institucional (Sincronizada desde SIGI)',
+                            'description' => 'Matriz de evaluación generada automáticamente por SIGI Académico.',
+                            'status'      => 20, // Estado 20 = Activo (Ready for use)
+                            'rubric'      => [
+                                'rubric_criteria' => $rubric_criteria
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        // 4. Inyectar en Moodle
+        $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
+
+        // Moodle WS devuelve una excepción explícita si falla. Si tiene éxito, devuelve null o array vacío.
+        if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
+            return [
+                'success' => false,
+                'message' => 'Moodle rechazó la rúbrica: ' . ($response['message'] ?? 'Error de validación')
+            ];
+        }
+
+        return ['success' => true, 'message' => 'Matriz inyectada en Moodle exitosamente.'];
+    }
 }

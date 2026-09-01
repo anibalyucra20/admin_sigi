@@ -636,26 +636,33 @@ class IntegracionController extends BaseApiController
             // --- BUSQUEDA ROBUSTA DE DATOS ---
             $payload = $data['details'] ?? $data;
 
-            // Mapeamos los nombres según el array que me pasaste
             $courseid = $payload['id_programacion'] ?? $payload['courseid'] ?? 0;
             $sectionid  = $payload['id_seccion_moodle'] ?? 0;
             $modname  = $payload['modname'] ?? $payload['moodle_type'] ?? '';
             $params   = $payload['moodle_params'] ?? $payload['moodle_data'] ?? [];
 
-            // Validación de seguridad
+            // Validación de seguridad base
             if (!$courseid || !$modname) {
                 $this->json([
                     'success' => false,
                     'message' => 'Datos incompletos en el payload',
-                    'debug_received' => $payload // Esto nos ayudará si vuelve a fallar
+                    'debug_received' => $payload
                 ]);
                 return;
+            }
+
+            // 1. AISLAR LA RÚBRICA (Crucial para no romper la API de Moodle)
+            $rubric_json = null;
+            if (isset($params['rubric_json'])) {
+                $rubric_json = $params['rubric_json'];
+                unset($params['rubric_json']); // Lo quitamos del payload de la actividad base
             }
 
             try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
+                // PASO 1: Crear la Actividad en Moodle
                 $resultado = $this->serviceMoodle->createModule(
                     $MOODLE_URL,
                     $MOODLE_TOKEN,
@@ -666,6 +673,27 @@ class IntegracionController extends BaseApiController
                 );
 
                 if ($resultado['success']) {
+
+                    // Flags para auditoría en el Response
+                    $rubrica_attached = false;
+                    $rubrica_msg = 'No se requirió rúbrica';
+
+                    // PASO 2: Si la actividad se creó y venía una rúbrica, la vinculamos
+                    if (!empty($rubric_json)) {
+                        $json_decodificado = is_string($rubric_json) ? json_decode($rubric_json, true) : $rubric_json;
+
+                        // Llamamos al servicio para guardar las definiciones de la rúbrica
+                        $resultadoRubrica = $this->serviceMoodle->crearRubricaEnActividad(
+                            $MOODLE_URL,
+                            $MOODLE_TOKEN,
+                            $resultado['cmid'],
+                            $json_decodificado
+                        );
+
+                        $rubrica_attached = $resultadoRubrica['success'] ?? false;
+                        $rubrica_msg = $resultadoRubrica['message'] ?? 'Rúbrica procesada';
+                    }
+
                     $this->json([
                         'success' => true,
                         'ok'      => true,
@@ -673,19 +701,22 @@ class IntegracionController extends BaseApiController
                         'data'    => [
                             'cmid'     => $resultado['cmid'],
                             'instance' => $resultado['instance'],
-                            'url'      => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
+                            'url'      => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid'],
+                            'rubrica_attached' => $rubrica_attached,
+                            'rubrica_msg'      => $rubrica_msg
                         ]
                     ]);
                 } else {
                     $this->json([
                         'success' => false,
-                        'message' => 'Moodle rechazó la creación: ' . ($resultado['error'] ?? 'Error desconocido')
+                        'message' => 'Moodle rechazó la creación de la actividad: ' . ($resultado['error'] ?? 'Error desconocido')
                     ]);
                 }
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
             }
-            //$this->json(['success' => false, 'data' => $data]);
+        } else {
+            $this->json(['success' => false, 'message' => 'Integración con Moodle inactiva para este tenant.']);
         }
     }
 
