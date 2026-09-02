@@ -775,8 +775,11 @@ class MoodleService
             }
 
             $desc = trim($criterio['description'] ?? '');
+            $sortorder = isset($criterio['sortorder'])
+                ? (int)$criterio['sortorder']
+                : $sortOrderCrit++;
             $rubric_criteria[] = [
-                'sortorder'         => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
+                'sortorder' => $sortorder,
                 'description'       => $desc === '' ? '-' : $desc,
                 'descriptionformat' => 1, // 1 = FORMAT_HTML (OBLIGATORIO en Moodle 5)
                 'levels'            => $levels
@@ -800,7 +803,7 @@ class MoodleService
                             'descriptionformat' => 1,
                             'status'      => 20, // 20 = Estado Activo
                             'rubric'      => [
-                                'criteria' => $rubric_criteria,
+                                'rubric_criteria' => $rubric_criteria,
                                 // === OPCIONES DE RÚBRICA OBLIGATORIAS (Mapeo Moodle DB) ===
                                 'options'  => [
                                     'sortlevelsasc'          => 1, // 1 = Ascendente, 0 = Descendente
@@ -821,7 +824,12 @@ class MoodleService
         ];
 
         // LOG DE AUDITORÍA: Registrar el JSON formateado antes del envío
-        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode($paramsMoodle));
+        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode(
+            $paramsMoodle,
+            JSON_UNESCAPED_UNICODE |
+                JSON_UNESCAPED_SLASHES |
+                JSON_PRETTY_PRINT
+        ));
 
         // Enviar Web Service a Moodle
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
