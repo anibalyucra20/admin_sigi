@@ -679,22 +679,21 @@ class IntegracionController extends BaseApiController
                     $rubrica_msg = 'No se requirió rúbrica';
 
                     // PASO 2: Si la actividad se creó y venía una rúbrica, la vinculamos
-                    if (!empty($rubric_json)) {
+                    if (!empty($rubric_json) && !empty($resultado['contextid'])) {
                         $json_decodificado = is_string($rubric_json) ? json_decode($rubric_json, true) : $rubric_json;
 
                         $resultadoRubrica = $this->serviceMoodle->crearRubricaEnActividad(
                             $MOODLE_URL,
                             $MOODLE_TOKEN,
-                            $resultado['cmid'],
+                            $resultado['contextid'], // <-- PASAMOS EL CONTEXT ID DIRECTO
                             $json_decodificado
                         );
 
                         $rubrica_attached = $resultadoRubrica['success'] ?? false;
                         $rubrica_msg = $resultadoRubrica['message'] ?? 'Rúbrica procesada';
 
-                        // LOG DE AUDITORÍA: Escribir en el log de PHP qué contestó Moodle
                         if (!$rubrica_attached) {
-                            error_log("[SIGI ERROR RUBRICA] " . json_encode($resultadoRubrica));
+                            error_log("[SIGI-RUBRICA-ERROR] " . json_encode($resultadoRubrica));
                         }
                     } else {
                         error_log("[SIGI INFO] No llegó 'rubric_json' al Master.");

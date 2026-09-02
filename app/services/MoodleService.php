@@ -522,7 +522,8 @@ class MoodleService
             return [
                 'success'  => true,
                 'cmid'     => $response['cmid'],
-                'instance' => $response['instance']
+                'instance' => $response['instance'],
+                'contextid' => $response['contextid'] ?? null
             ];
         }
 
@@ -753,49 +754,47 @@ class MoodleService
      * @param array $rubricData JSON decodificado con los criterios y niveles de SIGI
      * @return array Array de respuesta con success y message
      */
-    public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $cmid, $rubricData)
+    public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $contextId, $rubricData)
     {
-        // 1. Obtener el contexto vital
-        $contextId = $this->obtenerContextIdPorCmid($MOODLE_URL, $MOODLE_TOKEN, $cmid);
-
         if (!$contextId) {
-            return ['success' => false, 'message' => 'No se pudo obtener el contexto del módulo desde Moodle.'];
+            return ['success' => false, 'message' => 'Falta el ContextID del módulo.'];
         }
 
-        // 2. Mapeo estricto del JSON Local a la estructura del WS de Moodle
         $rubric_criteria = [];
         $sortOrderCrit = 1;
 
         foreach ($rubricData['criterios'] as $criterio) {
             $levels = [];
             foreach ($criterio['niveles'] as $nivel) {
+                // Moodle falla si definition está vacío, ponemos espacio por defecto
+                $def = trim($nivel['definition'] ?? '');
                 $levels[] = [
-                    'score' => (float)$nivel['score'],
-                    'definition' => trim($nivel['definition'] ?? '')
+                    'score'      => (float)$nivel['score'],
+                    'definition' => $def === '' ? ' ' : $def
                 ];
             }
 
+            $desc = trim($criterio['description'] ?? '');
             $rubric_criteria[] = [
-                'sortorder' => $criterio['sortorder'] ?? $sortOrderCrit++,
-                'description' => trim($criterio['description'] ?? ''),
-                'levels' => $levels
+                'sortorder'   => $criterio['sortorder'] ?? $sortOrderCrit++,
+                'description' => $desc === '' ? ' ' : $desc, // Protección anti-errores
+                'levels'      => $levels
             ];
         }
 
-        // 3. Empaquetar el Payload (Moodle es muy estricto con esta anidación)
         $paramsMoodle = [
             'areas' => [
                 [
-                    'contextid'    => $contextId,
-                    'component'    => 'mod_assign', // Normalmente las rúbricas van en Tareas
+                    'contextid'    => (int)$contextId,
+                    'component'    => 'mod_assign',
                     'areaname'     => 'submissions',
                     'activemethod' => 'rubric',
                     'definitions'  => [
                         [
                             'method'      => 'rubric',
-                            'name'        => 'Rúbrica Institucional (Sincronizada desde SIGI)',
-                            'description' => 'Matriz de evaluación generada automáticamente por SIGI Académico.',
-                            'status'      => 20, // Estado 20 = Activo (Ready for use)
+                            'name'        => 'Rúbrica de Evaluación SIGI',
+                            'description' => 'Matriz sincronizada desde SIGI Académico',
+                            'status'      => 20, // 20 = PUBLICADA/ACTIVA
                             'rubric'      => [
                                 'rubric_criteria' => $rubric_criteria
                             ]
@@ -805,17 +804,13 @@ class MoodleService
             ]
         ];
 
-        // 4. Inyectar en Moodle
+        // Ejecutamos la petición hacia Moodle
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
 
-        // Moodle WS devuelve una excepción explícita si falla. Si tiene éxito, devuelve null o array vacío.
         if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
-            return [
-                'success' => false,
-                'message' => 'Moodle rechazó la rúbrica: ' . ($response['message'] ?? 'Error de validación')
-            ];
+            return ['success' => false, 'message' => 'Moodle rechazó la matriz: ' . ($response['message'] ?? 'Error desconocido')];
         }
 
-        return ['success' => true, 'message' => 'Matriz inyectada en Moodle exitosamente.'];
+        return ['success' => true, 'message' => 'Matriz de rúbrica sincronizada exitosamente'];
     }
 }
