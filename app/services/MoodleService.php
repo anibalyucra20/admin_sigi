@@ -763,25 +763,32 @@ class MoodleService
         $rubric_criteria = [];
         $sortOrderCrit = 1;
 
-        foreach ($rubricData['criterios'] as $criterio) {
+        // array_values() garantiza que Moodle reciba índices estrictos: 0, 1, 2...
+        $criteriosLimpios = array_values($rubricData['criterios'] ?? []);
+
+        foreach ($criteriosLimpios as $criterio) {
             $levels = [];
-            foreach ($criterio['niveles'] as $nivel) {
-                // Moodle falla si definition está vacío, ponemos espacio por defecto
+            $nivelesLimpios = array_values($criterio['niveles'] ?? []);
+
+            foreach ($nivelesLimpios as $nivel) {
                 $def = trim($nivel['definition'] ?? '');
                 $levels[] = [
-                    'score'      => (float)$nivel['score'],
-                    'definition' => $def === '' ? ' ' : $def
+                    'score'            => round((float)$nivel['score'], 2), // Obliga tipo Flotante
+                    'definition'       => $def === '' ? ' ' : $def,
+                    'definitionformat' => 1 // 1 = FORMAT_HTML (Previene Invalid Parameter)
                 ];
             }
 
             $desc = trim($criterio['description'] ?? '');
             $rubric_criteria[] = [
-                'sortorder'   => $criterio['sortorder'] ?? $sortOrderCrit++,
-                'description' => $desc === '' ? ' ' : $desc, // Protección anti-errores
-                'levels'      => $levels
+                'sortorder'         => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
+                'description'       => $desc === '' ? ' ' : $desc,
+                'descriptionformat' => 1, // 1 = FORMAT_HTML
+                'levels'            => $levels
             ];
         }
 
+        // Empaquetado estricto (Payload Marshalling)
         $paramsMoodle = [
             'areas' => [
                 [
@@ -792,9 +799,10 @@ class MoodleService
                     'definitions'  => [
                         [
                             'method'      => 'rubric',
-                            'name'        => 'Rúbrica de Evaluación SIGI',
-                            'description' => 'Matriz sincronizada desde SIGI Académico',
-                            'status'      => 20, // 20 = PUBLICADA/ACTIVA
+                            'name'        => 'Rubrica SIGI', // Sin caracteres especiales por seguridad
+                            'description' => 'Matriz sincronizada desde SIGI Academico',
+                            'descriptionformat' => 1,
+                            'status'      => 20, // 20 = Activo/Publicado
                             'rubric'      => [
                                 'rubric_criteria' => $rubric_criteria
                             ]
@@ -804,11 +812,19 @@ class MoodleService
             ]
         ];
 
-        // Ejecutamos la petición hacia Moodle
+        // LOG DE AUDITORÍA: Escribimos el Payload exacto en el servidor.
+        // Si falla, en tu error.log verás exactamente cómo se armó la estructura.
+        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode($paramsMoodle));
+
+        // Ejecución hacia Moodle
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
 
+        // Validación de Error (Moodle WS Exceptions)
         if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
-            return ['success' => false, 'message' => 'Moodle rechazó la matriz: ' . ($response['message'] ?? 'Error desconocido')];
+            return [
+                'success' => false,
+                'message' => 'Moodle rechazó la matriz: ' . ($response['message'] ?? $response['errorcode'])
+            ];
         }
 
         return ['success' => true, 'message' => 'Matriz de rúbrica sincronizada exitosamente'];
