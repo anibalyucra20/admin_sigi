@@ -473,6 +473,10 @@ class MoodleService
 
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseid, $sectionid, $modname, $params)
     {
+        // 1. Extraemos el JSON si viene en el payload
+        $rubric_json = $params['rubric_json'] ?? '';
+        unset($params['rubric_json']); // Lo quitamos de las opciones customizadas
+        
         $customOptions = [];
         $exclude = ['name', 'intro'];
 
