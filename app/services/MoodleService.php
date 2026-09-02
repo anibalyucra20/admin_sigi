@@ -912,14 +912,14 @@ class MoodleService
 */
 
 $response = $this->call(
-    $MOODLE_URL,
-    $MOODLE_TOKEN,
     'core_grading_get_definitions',
     [
         'cmids' => [(int)$cmid],
         'areaname' => 'submissions',
         'activeonly' => 0
-    ]
+    ],
+    $MOODLE_URL,
+    $MOODLE_TOKEN
 );
 
 error_log(
