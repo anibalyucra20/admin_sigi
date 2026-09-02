@@ -682,7 +682,6 @@ class IntegracionController extends BaseApiController
                     if (!empty($rubric_json)) {
                         $json_decodificado = is_string($rubric_json) ? json_decode($rubric_json, true) : $rubric_json;
 
-                        // Llamamos al servicio para guardar las definiciones de la rúbrica
                         $resultadoRubrica = $this->serviceMoodle->crearRubricaEnActividad(
                             $MOODLE_URL,
                             $MOODLE_TOKEN,
@@ -692,6 +691,13 @@ class IntegracionController extends BaseApiController
 
                         $rubrica_attached = $resultadoRubrica['success'] ?? false;
                         $rubrica_msg = $resultadoRubrica['message'] ?? 'Rúbrica procesada';
+
+                        // LOG DE AUDITORÍA: Escribir en el log de PHP qué contestó Moodle
+                        if (!$rubrica_attached) {
+                            error_log("[SIGI ERROR RUBRICA] " . json_encode($resultadoRubrica));
+                        }
+                    } else {
+                        error_log("[SIGI INFO] No llegó 'rubric_json' al Master.");
                     }
 
                     $this->json([
