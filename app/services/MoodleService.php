@@ -746,17 +746,8 @@ class MoodleService
     }
 
     /**
-     * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones de Moodle.
-     * 
-     * @param string $MOODLE_URL
-     * @param string $MOODLE_TOKEN
-     * @param int $cmid ID del módulo del curso
-     * @param array $rubricData JSON decodificado con los criterios y niveles de SIGI
-     * @return array Array de respuesta con success y message
-     */
-    /**
-     * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones de Moodle.
-     * Versión Blindada: Sanitización extrema y extracción de Debug Info.
+     * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones.
+     * Compatible con Moodle 5.1.1 (Strict Typings & Obligatory Options)
      */
     public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $contextId, $rubricData)
     {
@@ -767,29 +758,33 @@ class MoodleService
         $rubric_criteria = [];
         $sortOrderCrit = 1;
 
+        // Limpieza de índices para asegurar un array secuencial
         $criteriosLimpios = array_values($rubricData['criterios'] ?? []);
 
         foreach ($criteriosLimpios as $criterio) {
             $levels = [];
             $nivelesLimpios = array_values($criterio['niveles'] ?? []);
-            
+
             foreach ($nivelesLimpios as $nivel) {
                 $def = trim($nivel['definition'] ?? '');
                 $levels[] = [
-                    'score'      => (float)$nivel['score'], // Casteo estricto a flotante
-                    'definition' => $def === '' ? '-' : $def // Moodle rechaza textos vacíos
+                    'score'            => (float)$nivel['score'], // Casteo estricto
+                    'definition'       => $def === '' ? '-' : $def,
+                    'definitionformat' => 1 // 1 = FORMAT_HTML (OBLIGATORIO en Moodle 5)
                 ];
             }
 
             $desc = trim($criterio['description'] ?? '');
             $rubric_criteria[] = [
-                'sortorder'   => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
-                'description' => $desc === '' ? '-' : $desc, // Protección anti-vacíos
-                'levels'      => $levels
+                'sortorder'         => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
+                'description'       => $desc === '' ? '-' : $desc,
+                'descriptionformat' => 1, // 1 = FORMAT_HTML (OBLIGATORIO en Moodle 5)
+                'levels'            => $levels
             ];
         }
 
-        // Payload Mínimo Viable (Omitimos descriptionformat y definitionformat para evitar conflictos de validación)
+        // --- ARQUITECTURA DEL PAYLOAD ---
+        // Empaquetamos la matriz incluyendo las Opciones de Rúbrica exigidas por Moodle 5.1
         $paramsMoodle = [
             'areas' => [
                 [
@@ -800,11 +795,24 @@ class MoodleService
                     'definitions'  => [
                         [
                             'method'      => 'rubric',
-                            'name'        => 'Rubrica SIGI',
-                            'description' => 'Matriz sincronizada',
-                            'status'      => 20, 
+                            'name'        => 'Rubrica Institucional (SIGI)',
+                            'description' => 'Matriz de evaluación sincronizada desde SIGI Académico.',
+                            'descriptionformat' => 1,
+                            'status'      => 20, // 20 = Estado Activo
                             'rubric'      => [
-                                'criteria' => $rubric_criteria 
+                                'criteria' => $rubric_criteria,
+                                // === OPCIONES DE RÚBRICA OBLIGATORIAS (Mapeo Moodle DB) ===
+                                'options'  => [
+                                    'sortlevelsasc'          => 1, // 1 = Ascendente, 0 = Descendente
+                                    'lockzeropoints'         => 1, // Calcular puntuación con nota mínima
+                                    'alwaysshowdefinition'   => 1, // Permitir previsualizar
+                                    'showdescriptionteacher' => 1, // Mostrar descripción al calificar
+                                    'showdescriptionstudent' => 1, // Mostrar descripción a evaluados
+                                    'showscoreteacher'       => 1, // Mostrar puntos al calificar
+                                    'showscorestudent'       => 1, // Mostrar puntos a evaluados
+                                    'enableremarks'          => 1, // Permitir observaciones
+                                    'showremarksstudent'     => 1  // Mostrar observaciones a evaluados
+                                ]
                             ]
                         ]
                     ]
@@ -812,16 +820,19 @@ class MoodleService
             ]
         ];
 
+        // LOG DE AUDITORÍA: Registrar el JSON formateado antes del envío
+        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode($paramsMoodle));
+
+        // Enviar Web Service a Moodle
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
 
-        // --- SISTEMA DE AUDITORÍA AVANZADA ---
+        // Control de Excepciones de la API de Moodle
         if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
-            // Moodle SIEMPRE envía un 'debuginfo' indicando el parámetro exacto que falló
             $debug = $response['debuginfo'] ?? 'Sin detalles adicionales';
             $errorMsg = $response['message'] ?? $response['errorcode'];
-            
+
             return [
-                'success' => false, 
+                'success' => false,
                 'message' => "Moodle rechazó la matriz: {$errorMsg} | Debug: {$debug}"
             ];
         }
