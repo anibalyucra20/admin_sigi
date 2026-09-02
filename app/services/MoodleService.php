@@ -837,33 +837,45 @@ class MoodleService
         $paramsMoodle = [
             'areas' => [
                 [
-                    // IMPORTANTE: Moodle espera ambos
-                    'cmid'      => (int)$cmid,
-                    'contextid' => (int)$contextId,
-
+                    'cmid' => (int) $cmid,
+                    'contextid' => (int) $contextId,
                     'component' => 'mod_assign',
-
                     'areaname' => 'submissions',
-
                     'activemethod' => 'rubric',
 
                     'definitions' => [
                         [
                             'method' => 'rubric',
-
-                            'name' =>
-                            'Rubrica Institucional (SIGI)',
-
-                            'description' =>
-                            'Matriz de evaluación sincronizada desde SIGI Académico.',
-
-                            'descriptionformat' => 1,
-
+                            'name' => 'TEST SIGI',
+                            'description' => '',
                             'status' => 20,
 
                             'rubric' => [
-                                'rubric_criteria' =>
-                                $rubric_criteria
+                                'rubric_criteria' => [
+                                    [
+                                        'sortorder' => 1,
+                                        'description' => 'Criterio de prueba',
+                                        'descriptionformat' => 0,
+
+                                        'levels' => [
+                                            [
+                                                'score' => 0,
+                                                'definition' => 'No cumple',
+                                                'definitionformat' => 0
+                                            ],
+                                            [
+                                                'score' => 50,
+                                                'definition' => 'Cumple parcialmente',
+                                                'definitionformat' => 0
+                                            ],
+                                            [
+                                                'score' => 100,
+                                                'definition' => 'Cumple completamente',
+                                                'definitionformat' => 0
+                                            ]
+                                        ]
+                                    ]
+                                ]
                             ]
                         ]
                     ]
