@@ -748,7 +748,7 @@ class MoodleService
 
     /**
      * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones.
-     * Compatible con Moodle 5.1.1 (Strict Typings)
+     * Payload 100% Homologado para Moodle 5.1.1 (Sin llaves intrusas).
      */
     public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $cmid, $contextId, $rubricData)
     {
@@ -790,25 +790,24 @@ class MoodleService
         }
 
         // ============================================================
-        // 2. PAYLOAD ESTRICTO PARA MOODLE (Sin cmid, llave 'criteria')
+        // 2. PAYLOAD ESTRICTO PARA MOODLE
         // ============================================================
         $paramsMoodle = [
             'areas' => [
                 [
-                    // NOTA ARQUITECTÓNICA: Jamás enviar 'cmid' aquí. Solo 'contextid'.
                     'contextid'    => (int) $contextId,
                     'component'    => 'mod_assign',
                     'areaname'     => 'submissions',
                     'activemethod' => 'rubric',
                     'definitions'  => [
                         [
-                            'method'            => 'rubric',
+                            // ELIMINADO: 'method' => 'rubric' (Este era el causante del error)
                             'name'              => 'Rúbrica Institucional SIGI',
                             'description'       => 'Matriz de evaluación sincronizada',
                             'descriptionformat' => 1,
-                            'status'            => 20, // 20 = PUBLICADO
+                            'status'            => 20, // 20 = PUBLICADO Y LISTO
                             'rubric'            => [
-                                'criteria' => $criteria_array // <-- LLAVE CORRECTA
+                                'criteria' => $criteria_array
                             ]
                         ]
                     ]
