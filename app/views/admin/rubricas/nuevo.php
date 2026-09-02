@@ -39,6 +39,9 @@
         </div>
 
         <hr>
+        <div class="alert alert-info small">
+            <i class="fa fa-info-circle"></i> Construya la matriz de evaluación. Puede asignar puntos de forma independiente a cada celda de nivel.
+        </div>
         <h5 class="mb-3">Constructor de Criterios</h5>
 
         <div class="table-responsive">
@@ -58,7 +61,6 @@
             </table>
         </div>
 
-        <!-- Reemplaza tu div de botones por este -->
         <div class="mb-4">
             <button type="button" class="btn btn-primary btn-sm" id="btn-add-criterio">+ Agregar Criterio</button>
             <button type="button" class="btn btn-info btn-sm ml-2" data-toggle="modal" data-target="#modalImportarJSON">
@@ -156,25 +158,32 @@
         agregarCriterio();
 
         document.getElementById('btn-add-nivel').addEventListener('click', () => agregarNivel(0));
-        document.getElementById('btn-add-criterio').addEventListener('click', agregarCriterio);
+        document.getElementById('btn-add-criterio').addEventListener('click', () => agregarCriterio());
 
         function agregarNivel(puntajeDefecto = 0) {
             nivelCount++;
             const th = document.createElement('th');
             th.className = 'nivel-col';
+            // Cabecera sirve como puntaje Referencia/Base
             th.innerHTML = `
-      <div class="input-group input-group-sm mb-1">
-        <div class="input-group-prepend"><span class="input-group-text">Pts</span></div>
-        <input type="number" class="form-control input-score" value="${puntajeDefecto}" required>
-      </div>
-      <button type="button" class="btn btn-xs btn-danger btn-sm" onclick="eliminarNivel(this)">X</button>
-    `;
+                <div class="input-group input-group-sm mb-1">
+                    <div class="input-group-prepend"><span class="input-group-text" title="Puntaje Base/Referencia">Ref. Pts</span></div>
+                    <input type="number" class="form-control input-score" value="${puntajeDefecto}" min="0" step="any" required>
+                </div>
+                <button type="button" class="btn btn-xs btn-danger btn-sm" onclick="eliminarNivel(this)">X</button>
+            `;
             trCabecera.insertBefore(th, thAddNivel);
 
             // Agregar celda a los criterios ya existentes
             document.querySelectorAll('#tbodyCriterios tr').forEach(tr => {
                 const td = document.createElement('td');
-                td.innerHTML = `<textarea class="form-control input-def" rows="3" placeholder="Descripción de nivel" required></textarea>`;
+                td.innerHTML = `
+                    <div class="input-group input-group-sm mb-1">
+                        <div class="input-group-prepend"><span class="input-group-text bg-light">Pts</span></div>
+                        <input type="number" class="form-control input-cell-score text-center font-weight-bold text-primary" value="${puntajeDefecto}" min="0" step="any" required>
+                    </div>
+                    <textarea class="form-control input-def" rows="3" placeholder="Descripción de nivel" required></textarea>
+                `;
                 tr.appendChild(td);
             });
         }
@@ -189,21 +198,36 @@
             nivelCount--;
         };
 
-        function agregarCriterio(descripcion = '', definicionesNiveles = []) {
+        function agregarCriterio(descripcion = '', nivelesData = []) {
             if (typeof descripcion !== 'string') descripcion = '';
 
             const tr = document.createElement('tr');
             tr.className = 'criterio-row';
 
             let tds = `
-      <td>
-        <textarea class="form-control input-criterio-desc mb-1" rows="3" placeholder="Nombre/Desc. del Criterio" required>${descripcion}</textarea>
-        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Eliminar</button>
-      </td>
-    `;
+                <td>
+                    <textarea class="form-control input-criterio-desc mb-1" rows="3" placeholder="Nombre/Desc. del Criterio" required>${descripcion}</textarea>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">Eliminar</button>
+                </td>
+            `;
+            
             for (let i = 0; i < nivelCount; i++) {
-                let defText = definicionesNiveles[i] !== undefined ? definicionesNiveles[i] : '';
-                tds += `<td><textarea class="form-control input-def" rows="3" placeholder="Descripción de nivel" required>${defText}</textarea></td>`;
+                let defText = (nivelesData[i] && nivelesData[i].definition !== undefined) ? nivelesData[i].definition : '';
+                let cellScore = (nivelesData[i] && nivelesData[i].score !== undefined) ? nivelesData[i].score : 0;
+                
+                // Si es un criterio nuevo, copiamos el puntaje de la cabecera correspondiente
+                if (!nivelesData[i]) {
+                    const headerInput = document.querySelectorAll('.input-score')[i];
+                    if(headerInput) cellScore = headerInput.value;
+                }
+
+                tds += `<td>
+                    <div class="input-group input-group-sm mb-1">
+                        <div class="input-group-prepend"><span class="input-group-text bg-light">Pts</span></div>
+                        <input type="number" class="form-control input-cell-score text-center font-weight-bold text-primary" value="${cellScore}" min="0" step="any" required>
+                    </div>
+                    <textarea class="form-control input-def" rows="3" placeholder="Descripción de nivel" required>${defText}</textarea>
+                </td>`;
             }
 
             tr.innerHTML = tds;
@@ -219,9 +243,6 @@
             const payload = {
                 criterios: []
             };
-            const puntajes = [];
-
-            document.querySelectorAll('.input-score').forEach(input => puntajes.push(parseFloat(input.value) || 0));
 
             let sortOrder = 1;
             document.querySelectorAll('.criterio-row').forEach(tr => {
@@ -234,10 +255,13 @@
                     niveles: []
                 };
 
+                const cellScores = tr.querySelectorAll('.input-cell-score');
                 const textareasNiveles = tr.querySelectorAll('.input-def');
+                
                 textareasNiveles.forEach((textarea, idx) => {
+                    const scoreVal = parseFloat(cellScores[idx].value) || 0;
                     criterio.niveles.push({
-                        score: puntajes[idx],
+                        score: scoreVal,
                         definition: textarea.value.trim()
                     });
                 });
@@ -287,8 +311,8 @@
                 const nivelesBase = data.criterios[0].niveles;
                 nivelesBase.forEach(nivel => agregarNivel(nivel.score));
                 data.criterios.forEach(criterio => {
-                    const defs = criterio.niveles.map(n => n.definition);
-                    agregarCriterio(criterio.description, defs);
+                    // Pasamos todo el arreglo de niveles (con score y definition)
+                    agregarCriterio(criterio.description, criterio.niveles);
                 });
             } else {
                 agregarNivel(0);

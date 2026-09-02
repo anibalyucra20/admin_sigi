@@ -41,6 +41,9 @@
         </div>
 
         <hr>
+        <div class="alert alert-info small">
+            <i class="fa fa-info-circle"></i> Modifique la matriz de evaluación. Puede asignar puntos de forma independiente a cada celda de nivel.
+        </div>
         <h5 class="mb-3">Constructor de Criterios</h5>
 
         <div class="table-responsive">
@@ -58,13 +61,11 @@
             </table>
         </div>
 
-        <!-- Reemplaza tu div de botones por este -->
         <div class="mb-4">
             <button type="button" class="btn btn-primary btn-sm" id="btn-add-criterio">+ Agregar Criterio</button>
             <button type="button" class="btn btn-info btn-sm ml-2" data-toggle="modal" data-target="#modalImportarJSON">
                 <i class="fa fa-code"></i> Importar JSON
             </button>
-            <!-- NUEVO BOTÓN -->
             <button type="button" class="btn btn-dark btn-sm ml-2" onclick="previsualizarJSON()">
                 <i class="fa fa-eye"></i> Ver / Copiar JSON
             </button>
@@ -84,7 +85,6 @@
                     </div>
                     <div class="modal-body">
                         <div class="form-group">
-                            <!-- Textarea readonly para que no lo editen por error aquí -->
                             <textarea id="textarea_export_json" class="form-control text-monospace" rows="15" readonly></textarea>
                         </div>
                     </div>
@@ -154,29 +154,27 @@
 
         /**
          * Constructor Central: Reconstruye la matriz visual a partir de un objeto JSON.
-         * @param {Object} data - Objeto JSON con la estructura { criterios: [...] }
          */
         function construirMatriz(data) {
             if (data.criterios && data.criterios.length > 0) {
-                // Extraemos los niveles del primer criterio para armar las columnas
+                // Extraemos los niveles del primer criterio para armar las columnas base
                 const nivelesBase = data.criterios[0].niveles;
 
-                // Crear las columnas (Cabecera de Puntajes)
+                // Crear las columnas (Cabecera de Puntajes Referenciales)
                 nivelesBase.forEach(nivel => {
                     agregarNivelDOM(nivel.score);
                 });
 
-                // Crear las filas (Criterios y sus definiciones)
+                // Crear las filas (Criterios y sus definiciones con puntajes por celda)
                 data.criterios.forEach(criterio => {
-                    const defs = criterio.niveles.map(n => n.definition);
-                    agregarCriterioDOM(criterio.description, defs);
+                    agregarCriterioDOM(criterio.description, criterio.niveles);
                 });
             } else {
                 // Si el JSON está vacío, inicializar con estructura por defecto
                 agregarNivelDOM(0);
                 agregarNivelDOM(10);
                 agregarNivelDOM(20);
-                agregarCriterioDOM('', ['', '', '']);
+                agregarCriterioDOM('', []);
             }
         }
 
@@ -191,16 +189,12 @@
 
         /**
          * LÓGICA DE EXTRACCIÓN (NÚCLEO)
-         * Lee el DOM actual y construye el objeto JSON.
-         * Usado tanto por el Submit como por el Modal de Previsualización.
+         * Lee el DOM actual (puntajes desde las celdas) y construye el objeto JSON.
          */
         function compilarJSONMatriz() {
             const payload = { criterios: [] };
-            const puntajes = [];
-
-            document.querySelectorAll('.input-score').forEach(input => puntajes.push(parseFloat(input.value) || 0));
-
             let sortOrder = 1;
+            
             document.querySelectorAll('.criterio-row').forEach(tr => {
                 const descCriterio = tr.querySelector('.input-criterio-desc').value.trim();
                 if (!descCriterio) return;
@@ -211,10 +205,13 @@
                     niveles: []
                 };
                 
+                const cellScores = tr.querySelectorAll('.input-cell-score');
                 const textareasNiveles = tr.querySelectorAll('.input-def');
+                
                 textareasNiveles.forEach((textarea, idx) => {
+                    const scoreVal = parseFloat(cellScores[idx].value) || 0;
                     criterio.niveles.push({
-                        score: puntajes[idx],
+                        score: scoreVal,
                         definition: textarea.value.trim()
                     });
                 });
@@ -225,10 +222,6 @@
             return payload;
         }
 
-        /**
-         * Expuesto a window para ser llamado desde el botón del modal HTML.
-         * Procesa, valida e inyecta el JSON pegado por el usuario.
-         */
         window.procesarImportacionJSON = function() {
             const jsonText = document.getElementById('textarea_import_json').value.trim();
 
@@ -238,10 +231,8 @@
             }
 
             try {
-                // Parseo estricto
                 const dataImportada = JSON.parse(jsonText);
 
-                // Validación proactiva de la estructura requerida por Moodle
                 if (!dataImportada.criterios || !Array.isArray(dataImportada.criterios)) {
                     throw new Error("El JSON carece del nodo principal 'criterios' en formato array.");
                 }
@@ -249,11 +240,9 @@
                     throw new Error("Los criterios no contienen el array interno de 'niveles'.");
                 }
 
-                // Ejecución del flujo de reemplazo
                 limpiarMatrizDOM();
                 construirMatriz(dataImportada);
 
-                // Cierre de UI y feedback
                 $('#modalImportarJSON').modal('hide');
                 document.getElementById('textarea_import_json').value = '';
                 alert("JSON importado correctamente. Revise la matriz antes de guardar los cambios.");
@@ -264,23 +253,16 @@
             }
         };
 
-        /**
-         * Expuesto a window para previsualizar el JSON antes de guardar.
-         */
         window.previsualizarJSON = function() {
             const payload = compilarJSONMatriz();
-            // JSON.stringify con indentación de 2 espacios (Pretty Print)
             document.getElementById('textarea_export_json').value = JSON.stringify(payload, null, 2);
             $('#modalVerJSON').modal('show');
         };
 
-        /**
-         * Expuesto a window para copiar el JSON al portapapeles.
-         */
         window.copiarJSON = function() {
             const textarea = document.getElementById('textarea_export_json');
             textarea.select();
-            textarea.setSelectionRange(0, 99999); // Compatibilidad móvil
+            textarea.setSelectionRange(0, 99999); 
             
             navigator.clipboard.writeText(textarea.value).then(() => {
                 alert("JSON copiado al portapapeles.");
@@ -295,10 +277,11 @@
             nivelCount++;
             const th = document.createElement('th');
             th.className = 'nivel-col';
+            // Cabecera funciona como puntaje de Referencia para futuras inserciones
             th.innerHTML = `
                 <div class="input-group input-group-sm mb-1">
-                    <div class="input-group-prepend"><span class="input-group-text">Pts</span></div>
-                    <input type="number" class="form-control input-score" value="${puntaje}" required>
+                    <div class="input-group-prepend"><span class="input-group-text" title="Puntaje Base/Referencia">Ref. Pts</span></div>
+                    <input type="number" class="form-control input-score" value="${puntaje}" min="0" step="any" required>
                 </div>
                 <button type="button" class="btn btn-xs btn-danger btn-sm" onclick="eliminarNivel(this)">X</button>
             `;
@@ -306,7 +289,7 @@
         }
 
         // Lógica para agregar una fila (Criterio) al DOM
-        function agregarCriterioDOM(descripcion = '', definicionesNiveles = []) {
+        function agregarCriterioDOM(descripcion = '', nivelesData = []) {
             const tr = document.createElement('tr');
             tr.className = 'criterio-row';
 
@@ -317,10 +300,23 @@
                 </td>
             `;
 
-            // Rellenamos las celdas con la información existente o en blanco
             for (let i = 0; i < nivelCount; i++) {
-                let defText = definicionesNiveles[i] !== undefined ? definicionesNiveles[i] : '';
-                tds += `<td><textarea class="form-control input-def" rows="5" placeholder="Descripción" required>${defText}</textarea></td>`;
+                let defText = (nivelesData[i] && nivelesData[i].definition !== undefined) ? nivelesData[i].definition : '';
+                let cellScore = (nivelesData[i] && nivelesData[i].score !== undefined) ? nivelesData[i].score : 0;
+                
+                // Si es un nuevo criterio en blanco, hereda el puntaje de la cabecera respectiva
+                if (!nivelesData[i]) {
+                    const headerInput = document.querySelectorAll('.input-score')[i];
+                    if(headerInput) cellScore = headerInput.value;
+                }
+
+                tds += `<td>
+                    <div class="input-group input-group-sm mb-1">
+                        <div class="input-group-prepend"><span class="input-group-text bg-light">Pts</span></div>
+                        <input type="number" class="form-control input-cell-score text-center font-weight-bold text-primary" value="${cellScore}" min="0" step="any" required>
+                    </div>
+                    <textarea class="form-control input-def" rows="5" placeholder="Descripción" required>${defText}</textarea>
+                </td>`;
             }
 
             tr.innerHTML = tds;
@@ -332,7 +328,13 @@
             agregarNivelDOM(0);
             document.querySelectorAll('#tbodyCriterios tr').forEach(tr => {
                 const td = document.createElement('td');
-                td.innerHTML = `<textarea class="form-control input-def" rows="5" placeholder="Descripción" required></textarea>`;
+                td.innerHTML = `
+                    <div class="input-group input-group-sm mb-1">
+                        <div class="input-group-prepend"><span class="input-group-text bg-light">Pts</span></div>
+                        <input type="number" class="form-control input-cell-score text-center font-weight-bold text-primary" value="0" min="0" step="any" required>
+                    </div>
+                    <textarea class="form-control input-def" rows="5" placeholder="Descripción" required></textarea>
+                `;
                 tr.appendChild(td);
             });
         });
@@ -349,12 +351,11 @@
             nivelCount--;
         };
 
-        // Compilar JSON en el Submit (Refactorizado para usar la función central)
+        // Compilar JSON en el Submit
         document.getElementById('frmRubrica').addEventListener('submit', function(e) {
             const payload = compilarJSONMatriz();
             // Se envía minificado (sin espacios) para optimizar BD
             document.getElementById('input_contenido_json').value = JSON.stringify(payload);
-            // Permite que el formulario continúe su envío POST natural
         });
 
         // Disparar la reconstrucción inicial al cargar la página
