@@ -633,7 +633,7 @@ class IntegracionController extends BaseApiController
             $json_data = file_get_contents('php://input');
             $data = json_decode($json_data, true);
 
-            // --- BUSQUEDA ROBUSTA DE DATOS ---
+            // Búsqueda de datos
             $payload = $data['details'] ?? $data;
 
             $courseid = $payload['id_programacion'] ?? $payload['courseid'] ?? 0;
@@ -641,28 +641,21 @@ class IntegracionController extends BaseApiController
             $modname  = $payload['modname'] ?? $payload['moodle_type'] ?? '';
             $params   = $payload['moodle_params'] ?? $payload['moodle_data'] ?? [];
 
-            // Validación de seguridad base
+            // Validación base
             if (!$courseid || !$modname) {
                 $this->json([
                     'success' => false,
-                    'message' => 'Datos incompletos en el payload',
-                    'debug_received' => $payload
+                    'message' => 'Datos incompletos en el payload'
                 ]);
                 return;
-            }
-
-            // 1. AISLAR LA RÚBRICA (Crucial para no romper la API de Moodle)
-            $rubric_json = null;
-            if (isset($params['rubric_json'])) {
-                $rubric_json = $params['rubric_json'];
-                unset($params['rubric_json']); // Lo quitamos del payload de la actividad base
             }
 
             try {
                 $MOODLE_URL = $ies['MOODLE_URL'];
                 $MOODLE_TOKEN = $ies['MOODLE_TOKEN'];
 
-                // PASO 1: Crear la Actividad en Moodle
+                // PASO ÚNICO Y ATÓMICO: Enviamos a MoodleService
+                // (Si trae rubric_json, el plugin local_sigiws creará la matriz internamente)
                 $resultado = $this->serviceMoodle->createModule(
                     $MOODLE_URL,
                     $MOODLE_TOKEN,
@@ -673,56 +666,27 @@ class IntegracionController extends BaseApiController
                 );
 
                 if ($resultado['success']) {
-
-                    // Flags para auditoría en el Response
-                    $rubrica_attached = false;
-                    $rubrica_msg = 'No se requirió rúbrica';
-
-                    // PASO 2: Si la actividad se creó y venía una rúbrica, la vinculamos
-                    if (!empty($rubric_json) && !empty($resultado['contextid'])) {
-                        $json_decodificado = is_string($rubric_json) ? json_decode($rubric_json, true) : $rubric_json;
-
-                        $resultadoRubrica = $this->serviceMoodle->crearRubricaEnActividad(
-                            $MOODLE_URL,
-                            $MOODLE_TOKEN,
-                            $resultado['cmid'],
-                            $resultado['contextid'], // <-- PASAMOS EL CONTEXT ID DIRECTO
-                            $json_decodificado
-                        );
-
-                        $rubrica_attached = $resultadoRubrica['success'] ?? false;
-                        $rubrica_msg = $resultadoRubrica['message'] ?? 'Rúbrica procesada';
-
-                        if (!$rubrica_attached) {
-                            error_log("[SIGI-RUBRICA-ERROR] " . json_encode($resultadoRubrica));
-                        }
-                    } else {
-                        error_log("[SIGI INFO] No llegó 'rubric_json' al Master.");
-                    }
-
                     $this->json([
                         'success' => true,
                         'ok'      => true,
-                        'message' => 'Módulo creado exitosamente',
+                        'message' => 'Módulo y Matriz creados exitosamente',
                         'data'    => [
                             'cmid'     => $resultado['cmid'],
                             'instance' => $resultado['instance'],
-                            'url'      => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid'],
-                            'rubrica_attached' => $rubrica_attached,
-                            'rubrica_msg'      => $rubrica_msg
+                            'url'      => $MOODLE_URL . "/mod/{$modname}/view.php?id=" . $resultado['cmid']
                         ]
                     ]);
                 } else {
                     $this->json([
                         'success' => false,
-                        'message' => 'Moodle rechazó la creación de la actividad: ' . ($resultado['error'] ?? 'Error desconocido')
+                        'message' => 'Moodle rechazó la creación: ' . ($resultado['error'] ?? 'Error desconocido')
                     ]);
                 }
             } catch (\Exception $e) {
                 $this->json(['success' => false, 'message' => 'Excepción: ' . $e->getMessage()]);
             }
         } else {
-            $this->json(['success' => false, 'message' => 'Integración con Moodle inactiva para este tenant.']);
+            $this->json(['success' => false, 'message' => 'Integración con Moodle inactiva.']);
         }
     }
 

@@ -473,65 +473,46 @@ class MoodleService
 
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseid, $sectionid, $modname, $params)
     {
-        // 1. Extraemos el JSON si viene en el payload
-        $rubric_json = $params['rubric_json'] ?? '';
-        unset($params['rubric_json']); // Lo quitamos de las opciones customizadas
-        
+        // 1. Extraemos el JSON crudo si viene en el payload desde SIGI Local
+        $rubric_json = '';
+        if (isset($params['rubric_json'])) {
+            $rubric_json = is_array($params['rubric_json']) ? json_encode($params['rubric_json']) : $params['rubric_json'];
+            unset($params['rubric_json']); // Lo sacamos para que no ensucie el resto
+        }
+
         $customOptions = [];
         $exclude = ['name', 'intro'];
 
         foreach ($params as $key => $value) {
             if (!in_array($key, $exclude)) {
-                // Validamos si el valor es un array (como en optiontext)
-                // Si es array, lo convertimos a JSON para que no se transforme en el string "Array"
                 $finalValue = is_array($value) ? json_encode($value) : (string)$value;
-
                 $customOptions[] = [
-                    'name' => (string)$key,
+                    'name'  => (string)$key,
                     'value' => $finalValue
                 ];
             }
         }
 
-        // --- BLINDAJE DE SEGURIDAD PARA QUIZ ---
-        // Si es un cuestionario, nos aseguramos de que el campo 'password' viaje 
-        // al menos como una cadena vacía para evitar errores de base de datos (NOT NULL).
-        if ($modname === 'quiz') {
-            $hasPassword = false;
-            foreach ($customOptions as $option) {
-                if ($option['name'] === 'password') {
-                    $hasPassword = true;
-                    break;
-                }
-            }
-            if (!$hasPassword) {
-                $customOptions[] = [
-                    'name' => 'password',
-                    'value' => ''
-                ];
-            }
-        }
-
-        // Llamada a la función con el parámetro sectionid
+        // 2. LLAMADA ATÓMICA: Mandamos TODO (Tarea + Rúbrica) en un solo paquete a tu plugin local
         $response = $this->call('local_sigiws_create_module', [
             'courseid'      => (int)$courseid,
             'sectionid'     => (int)$sectionid,
             'modname'       => (string)$modname,
             'name'          => (string)($params['name'] ?? 'Actividad SIGI'),
             'intro'         => (string)($params['intro'] ?? ''),
-            'customoptions' => $customOptions
+            'customoptions' => $customOptions,
+            'rubric_json'   => (string)$rubric_json // <--- ¡ESTE ES EL DISPARADOR ATÓMICO!
         ], $MOODLE_URL, $MOODLE_TOKEN);
 
         if (isset($response['success']) && $response['success'] === true) {
             return [
                 'success'  => true,
                 'cmid'     => $response['cmid'],
-                'instance' => $response['instance'],
-                'contextid' => $response['contextid'] ?? null
+                'instance' => $response['instance']
             ];
         }
 
-        return ['success' => false, 'error' => $response['warnings'][0] ?? 'Error WebService'];
+        return ['success' => false, 'error' => $response['warnings'][0] ?? 'Error WebService local_sigiws'];
     }
 
 
