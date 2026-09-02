@@ -749,73 +749,121 @@ class MoodleService
      * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones.
      * Compatible con Moodle 5.1.1 (Strict Typings & Obligatory Options)
      */
-    public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $contextId, $rubricData)
-    {
-        if (!$contextId) {
-            return ['success' => false, 'message' => 'Falta el ContextID del módulo.'];
-        }
-
-        $rubric_criteria = [];
-        $sortOrderCrit = 1;
-
-        // Limpieza de índices para asegurar un array secuencial
-        $criteriosLimpios = array_values($rubricData['criterios'] ?? []);
-
-        foreach ($criteriosLimpios as $criterio) {
-            $levels = [];
-            $nivelesLimpios = array_values($criterio['niveles'] ?? []);
-
-            foreach ($nivelesLimpios as $nivel) {
-                $def = trim($nivel['definition'] ?? '');
-                $levels[] = [
-                    'score'            => (float)$nivel['score'], // Casteo estricto
-                    'definition'       => $def === '' ? '-' : $def,
-                    'definitionformat' => 1 // 1 = FORMAT_HTML (OBLIGATORIO en Moodle 5)
-                ];
-            }
-
-            $desc = trim($criterio['description'] ?? '');
-            $sortorder = isset($criterio['sortorder'])
-                ? (int)$criterio['sortorder']
-                : $sortOrderCrit++;
-            $rubric_criteria[] = [
-                'sortorder' => $sortorder,
-                'description'       => $desc === '' ? '-' : $desc,
-                'descriptionformat' => 1, // 1 = FORMAT_HTML (OBLIGATORIO en Moodle 5)
-                'levels'            => $levels
+    public function crearRubricaEnActividad(
+        $MOODLE_URL,
+        $MOODLE_TOKEN,
+        $cmid,
+        $contextId,
+        $rubricData
+    ) {
+        if (!$cmid) {
+            return [
+                'success' => false,
+                'message' => 'Falta el CMID de la actividad.'
             ];
         }
 
-        // --- ARQUITECTURA DEL PAYLOAD ---
-        // Empaquetamos la matriz incluyendo las Opciones de Rúbrica exigidas por Moodle 5.1
+        if (!$contextId) {
+            return [
+                'success' => false,
+                'message' => 'Falta el ContextID del módulo.'
+            ];
+        }
+
+        // ============================================================
+        // 1. CONSTRUIR CRITERIOS
+        // ============================================================
+
+        $rubric_criteria = [];
+
+        $sortOrderCrit = 1;
+
+        $criteriosLimpios = array_values(
+            $rubricData['criterios'] ?? []
+        );
+
+        foreach ($criteriosLimpios as $criterio) {
+
+            $levels = [];
+
+            $nivelesLimpios = array_values(
+                $criterio['niveles'] ?? []
+            );
+
+            foreach ($nivelesLimpios as $nivel) {
+
+                $definition = trim(
+                    $nivel['definition'] ?? ''
+                );
+
+                $levels[] = [
+                    'score' => (float)(
+                        $nivel['score'] ?? 0
+                    ),
+
+                    'definition' => $definition !== ''
+                        ? $definition
+                        : '-',
+
+                    'definitionformat' => 1
+                ];
+            }
+
+            $description = trim(
+                $criterio['description'] ?? ''
+            );
+
+            $sortorder = isset($criterio['sortorder'])
+                ? (int)$criterio['sortorder']
+                : $sortOrderCrit++;
+
+            $rubric_criteria[] = [
+                'sortorder' => $sortorder,
+
+                'description' => $description !== ''
+                    ? $description
+                    : '-',
+
+                'descriptionformat' => 1,
+
+                'levels' => $levels
+            ];
+        }
+
+        // ============================================================
+        // 2. PAYLOAD MINIMALISTA PARA MOODLE
+        // ============================================================
+
         $paramsMoodle = [
             'areas' => [
                 [
-                    'contextid'    => (int)$contextId,
-                    'component'    => 'mod_assign',
-                    'areaname'     => 'submissions',
+                    // IMPORTANTE: Moodle espera ambos
+                    'cmid'      => (int)$cmid,
+                    'contextid' => (int)$contextId,
+
+                    'component' => 'mod_assign',
+
+                    'areaname' => 'submissions',
+
                     'activemethod' => 'rubric',
-                    'definitions'  => [
+
+                    'definitions' => [
                         [
-                            'method'      => 'rubric',
-                            'name'        => 'Rubrica Institucional (SIGI)',
-                            'description' => 'Matriz de evaluación sincronizada desde SIGI Académico.',
+                            'method' => 'rubric',
+
+                            'name' =>
+                            'Rubrica Institucional (SIGI)',
+
+                            'description' =>
+                            'Matriz de evaluación sincronizada desde SIGI Académico.',
+
                             'descriptionformat' => 1,
-                            'status'      => 20, // 20 = Estado Activo
-                            'rubric'      => [
-                                'rubric_criteria' => $rubric_criteria,
-                                // === OPCIONES DE RÚBRICA OBLIGATORIAS (Mapeo Moodle DB) ===
-                                'options'  => [
-                                    'sortlevelsasc'          => 1, // 1 = Ascendente, 0 = Descendente
-                                    'lockzeropoints'         => 1, // Calcular puntuación con nota mínima
-                                    'alwaysshowdefinition'   => 1, // Permitir previsualizar
-                                    'showdescriptionteacher' => 1, // Mostrar descripción al calificar
-                                    'showdescriptionstudent' => 1, // Mostrar descripción a evaluados
-                                    'showscoreteacher'       => 1, // Mostrar puntos al calificar
-                                    'showscorestudent'       => 1, // Mostrar puntos a evaluados
-                                    'enableremarks'          => 1, // Permitir observaciones
-                                    'showremarksstudent'     => 1  // Mostrar observaciones a evaluados
-                                ]
+
+                            'status' => 20,
+
+                            'rubric' => [
+                                'rubric_criteria' =>
+                                $rubric_criteria
                             ]
                         ]
                     ]
@@ -823,28 +871,87 @@ class MoodleService
             ]
         ];
 
-        // LOG DE AUDITORÍA: Registrar el JSON formateado antes del envío
-        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode(
+        // ============================================================
+        // 3. DEBUG
+        // ============================================================
+
+        error_log(
+            '[SIGI-RUBRICA-PAYLOAD] ' .
+                json_encode(
+                    $paramsMoodle,
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_PRETTY_PRINT
+                )
+        );
+
+        // ============================================================
+        // 4. ENVIAR A MOODLE
+        // ============================================================
+
+        $response = $this->call(
+            'core_grading_save_definitions',
             $paramsMoodle,
-            JSON_UNESCAPED_UNICODE |
-                JSON_UNESCAPED_SLASHES |
-                JSON_PRETTY_PRINT
-        ));
+            $MOODLE_URL,
+            $MOODLE_TOKEN
+        );
 
-        // Enviar Web Service a Moodle
-        $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
+        // ============================================================
+        // 5. DEBUG RESPUESTA
+        // ============================================================
 
-        // Control de Excepciones de la API de Moodle
-        if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
-            $debug = $response['debuginfo'] ?? 'Sin detalles adicionales';
-            $errorMsg = $response['message'] ?? $response['errorcode'];
+        error_log(
+            '[SIGI-RUBRICA-RESPONSE] ' .
+                json_encode(
+                    $response,
+                    JSON_UNESCAPED_UNICODE |
+                        JSON_UNESCAPED_SLASHES |
+                        JSON_PRETTY_PRINT
+                )
+        );
+
+        // ============================================================
+        // 6. ERROR MOODLE
+        // ============================================================
+
+        if (
+            is_array($response) &&
+            (
+                isset($response['exception']) ||
+                isset($response['errorcode'])
+            )
+        ) {
+
+            $debug = $response['debuginfo']
+                ?? 'Sin detalles adicionales';
+
+            $errorMsg = $response['message']
+                ?? ($response['errorcode']
+                    ?? 'Error desconocido');
 
             return [
                 'success' => false,
-                'message' => "Moodle rechazó la matriz: {$errorMsg} | Debug: {$debug}"
+
+                'message' =>
+                "Moodle rechazó la matriz: {$errorMsg}",
+
+                'debug' => $debug,
+
+                'response' => $response
             ];
         }
 
-        return ['success' => true, 'message' => 'Matriz de rúbrica sincronizada exitosamente'];
+        // ============================================================
+        // 7. ÉXITO
+        // ============================================================
+
+        return [
+            'success' => true,
+
+            'message' =>
+            'Matriz de rúbrica sincronizada exitosamente',
+
+            'response' => $response
+        ];
     }
 }

@@ -685,6 +685,7 @@ class IntegracionController extends BaseApiController
                         $resultadoRubrica = $this->serviceMoodle->crearRubricaEnActividad(
                             $MOODLE_URL,
                             $MOODLE_TOKEN,
+                            $resultado['cmid'],
                             $resultado['contextid'], // <-- PASAMOS EL CONTEXT ID DIRECTO
                             $json_decodificado
                         );
