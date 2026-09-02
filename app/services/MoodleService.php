@@ -754,6 +754,10 @@ class MoodleService
      * @param array $rubricData JSON decodificado con los criterios y niveles de SIGI
      * @return array Array de respuesta con success y message
      */
+    /**
+     * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones de Moodle.
+     * Versión Blindada: Sanitización extrema y extracción de Debug Info.
+     */
     public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $contextId, $rubricData)
     {
         if (!$contextId) {
@@ -768,26 +772,24 @@ class MoodleService
         foreach ($criteriosLimpios as $criterio) {
             $levels = [];
             $nivelesLimpios = array_values($criterio['niveles'] ?? []);
-
+            
             foreach ($nivelesLimpios as $nivel) {
                 $def = trim($nivel['definition'] ?? '');
                 $levels[] = [
-                    'score'            => round((float)$nivel['score'], 2),
-                    'definition'       => $def === '' ? ' ' : $def,
-                    'definitionformat' => 1
+                    'score'      => (float)$nivel['score'], // Casteo estricto a flotante
+                    'definition' => $def === '' ? '-' : $def // Moodle rechaza textos vacíos
                 ];
             }
 
             $desc = trim($criterio['description'] ?? '');
             $rubric_criteria[] = [
-                'sortorder'         => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
-                'description'       => $desc === '' ? ' ' : $desc,
-                'descriptionformat' => 1,
-                'levels'            => $levels
+                'sortorder'   => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
+                'description' => $desc === '' ? '-' : $desc, // Protección anti-vacíos
+                'levels'      => $levels
             ];
         }
 
-        // El payload ha sido reestructurado: Moodle rechaza el nodo 'rubric_criteria' y exige estrictamente 'criteria'
+        // Payload Mínimo Viable (Omitimos descriptionformat y definitionformat para evitar conflictos de validación)
         $paramsMoodle = [
             'areas' => [
                 [
@@ -799,11 +801,10 @@ class MoodleService
                         [
                             'method'      => 'rubric',
                             'name'        => 'Rubrica SIGI',
-                            'description' => 'Matriz sincronizada desde SIGI Academico',
-                            'descriptionformat' => 1,
-                            'status'      => 20,
+                            'description' => 'Matriz sincronizada',
+                            'status'      => 20, 
                             'rubric'      => [
-                                'criteria' => $rubric_criteria // <-- CORRECCIÓN ARQUITECTÓNICA 
+                                'criteria' => $rubric_criteria 
                             ]
                         ]
                     ]
@@ -813,10 +814,15 @@ class MoodleService
 
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
 
+        // --- SISTEMA DE AUDITORÍA AVANZADA ---
         if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
+            // Moodle SIEMPRE envía un 'debuginfo' indicando el parámetro exacto que falló
+            $debug = $response['debuginfo'] ?? 'Sin detalles adicionales';
+            $errorMsg = $response['message'] ?? $response['errorcode'];
+            
             return [
-                'success' => false,
-                'message' => 'Moodle rechazó la matriz: ' . ($response['message'] ?? $response['errorcode'])
+                'success' => false, 
+                'message' => "Moodle rechazó la matriz: {$errorMsg} | Debug: {$debug}"
             ];
         }
 
