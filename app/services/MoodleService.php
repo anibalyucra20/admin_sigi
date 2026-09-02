@@ -745,133 +745,70 @@ class MoodleService
         return false;
     }
 
+
     /**
      * Paso 2: Inyectar la matriz estructurada al motor avanzado de calificaciones.
-     * Compatible con Moodle 5.1.1 (Strict Typings & Obligatory Options)
+     * Compatible con Moodle 5.1.1 (Strict Typings)
      */
-    public function crearRubricaEnActividad(
-        $MOODLE_URL,
-        $MOODLE_TOKEN,
-        $cmid,
-        $contextId,
-        $rubricData
-    ) {
-        if (!$cmid) {
+    public function crearRubricaEnActividad($MOODLE_URL, $MOODLE_TOKEN, $cmid, $contextId, $rubricData)
+    {
+        if (!$cmid || !$contextId) {
             return [
                 'success' => false,
-                'message' => 'Falta el CMID de la actividad.'
-            ];
-        }
-
-        if (!$contextId) {
-            return [
-                'success' => false,
-                'message' => 'Falta el ContextID del módulo.'
+                'message' => 'Faltan parámetros de contexto o CMID.'
             ];
         }
 
         // ============================================================
-        // 1. CONSTRUIR CRITERIOS
+        // 1. CONSTRUIR CRITERIOS DINÁMICAMENTE
         // ============================================================
-
-        $rubric_criteria = [];
-
+        $criteria_array = [];
         $sortOrderCrit = 1;
 
-        $criteriosLimpios = array_values(
-            $rubricData['criterios'] ?? []
-        );
+        $criteriosLimpios = array_values($rubricData['criterios'] ?? []);
 
         foreach ($criteriosLimpios as $criterio) {
-
-            $levels = [];
-
-            $nivelesLimpios = array_values(
-                $criterio['niveles'] ?? []
-            );
+            $levels_array = [];
+            $nivelesLimpios = array_values($criterio['niveles'] ?? []);
 
             foreach ($nivelesLimpios as $nivel) {
-
-                $definition = trim(
-                    $nivel['definition'] ?? ''
-                );
-
-                $levels[] = [
-                    'score' => (float)(
-                        $nivel['score'] ?? 0
-                    ),
-
-                    'definition' => $definition !== ''
-                        ? $definition
-                        : '-',
-
+                $definition = trim($nivel['definition'] ?? '');
+                $levels_array[] = [
+                    'score'            => (float)($nivel['score'] ?? 0),
+                    'definition'       => $definition !== '' ? $definition : '-',
                     'definitionformat' => 1
                 ];
             }
 
-            $description = trim(
-                $criterio['description'] ?? ''
-            );
-
-            $sortorder = isset($criterio['sortorder'])
-                ? (int)$criterio['sortorder']
-                : $sortOrderCrit++;
-
-            $rubric_criteria[] = [
-                'sortorder' => $sortorder,
-
-                'description' => $description !== ''
-                    ? $description
-                    : '-',
-
+            $description = trim($criterio['description'] ?? '');
+            $criteria_array[] = [
+                'sortorder'         => isset($criterio['sortorder']) ? (int)$criterio['sortorder'] : $sortOrderCrit++,
+                'description'       => $description !== '' ? $description : '-',
                 'descriptionformat' => 1,
-
-                'levels' => $levels
+                'levels'            => $levels_array
             ];
         }
 
         // ============================================================
-        // 2. PAYLOAD MINIMALISTA PARA MOODLE
+        // 2. PAYLOAD ESTRICTO PARA MOODLE (Sin cmid, llave 'criteria')
         // ============================================================
-
         $paramsMoodle = [
             'areas' => [
                 [
-                    'cmid' => (int) $cmid,
-                    'contextid' => (int) $contextId,
-                    'component' => 'mod_assign',
-                    'areaname' => 'submissions',
+                    // NOTA ARQUITECTÓNICA: Jamás enviar 'cmid' aquí. Solo 'contextid'.
+                    'contextid'    => (int) $contextId,
+                    'component'    => 'mod_assign',
+                    'areaname'     => 'submissions',
                     'activemethod' => 'rubric',
-
-                    'definitions' => [
+                    'definitions'  => [
                         [
-                            'method' => 'rubric',
-                            'name' => 'TEST SIGI',
-                            'description' => '',
+                            'method'            => 'rubric',
+                            'name'              => 'Rúbrica Institucional SIGI',
+                            'description'       => 'Matriz de evaluación sincronizada',
                             'descriptionformat' => 1,
-                            'status' => 20,
-
-                            'rubric' => [
-                                'rubric_criteria' => [
-                                    [
-                                        'sortorder' => 0,
-                                        'description' => 'Criterio de prueba',
-                                        'descriptionformat' => 1,
-
-                                        'levels' => [
-                                            [
-                                                'score' => 0,
-                                                'definition' => 'No cumple',
-                                                'definitionformat' => 1
-                                            ],
-                                            [
-                                                'score' => 1,
-                                                'definition' => 'Cumple',
-                                                'definitionformat' => 1
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                            'status'            => 20, // 20 = PUBLICADO
+                            'rubric'            => [
+                                'criteria' => $criteria_array // <-- LLAVE CORRECTA
                             ]
                         ]
                     ]
@@ -880,22 +817,9 @@ class MoodleService
         ];
 
         // ============================================================
-        // 3. DEBUG
+        // 3. DEBUG & EJECUCIÓN
         // ============================================================
-
-        error_log(
-            '[SIGI-RUBRICA-PAYLOAD] ' .
-                json_encode(
-                    $paramsMoodle,
-                    JSON_UNESCAPED_UNICODE |
-                        JSON_UNESCAPED_SLASHES |
-                        JSON_PRETTY_PRINT
-                )
-        );
-
-        // ============================================================
-        // 4. ENVIAR A MOODLE
-        // ============================================================
+        error_log('[SIGI-RUBRICA-PAYLOAD] ' . json_encode($paramsMoodle, JSON_UNESCAPED_UNICODE));
 
         $response = $this->call(
             'core_grading_save_definitions',
@@ -904,80 +828,26 @@ class MoodleService
             $MOODLE_TOKEN
         );
 
+        error_log('[SIGI-RUBRICA-RESPONSE] ' . json_encode($response, JSON_UNESCAPED_UNICODE));
+
         // ============================================================
-        // 5. DEBUG RESPUESTA
+        // 4. CONTROL DE ERRORES
         // ============================================================
-
-        error_log(
-            '[SIGI-RUBRICA-RESPONSE] ' .
-                json_encode(
-                    $response,
-                    JSON_UNESCAPED_UNICODE |
-                        JSON_UNESCAPED_SLASHES |
-                        JSON_PRETTY_PRINT
-                )
-        );
-
-
-        /*$response = $this->call(
-    'core_grading_get_definitions',
-    [
-        'cmids' => [(int)$cmid],
-        'areaname' => 'submissions',
-        'activeonly' => 0
-    ],
-    $MOODLE_URL,
-    $MOODLE_TOKEN
-);*/
-
-        error_log(
-            '[SIGI-GRADING-DEFINITIONS] ' .
-                json_encode(
-                    $response,
-                    JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-                )
-        );
-        // ============================================================
-        // 6. ERROR MOODLE
-        // ============================================================
-
-        if (
-            is_array($response) &&
-            (
-                isset($response['exception']) ||
-                isset($response['errorcode'])
-            )
-        ) {
-
-            $debug = $response['debuginfo']
-                ?? 'Sin detalles adicionales';
-
-            $errorMsg = $response['message']
-                ?? ($response['errorcode']
-                    ?? 'Error desconocido');
+        if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
+            $debug = $response['debuginfo'] ?? 'Sin detalles adicionales';
+            $errorMsg = $response['message'] ?? ($response['errorcode'] ?? 'Error desconocido');
 
             return [
-                'success' => false,
-
-                'message' =>
-                "Moodle rechazó la matriz: {$errorMsg}",
-
-                'debug' => $debug,
-
+                'success'  => false,
+                'message'  => "Moodle rechazó la matriz: {$errorMsg}",
+                'debug'    => $debug,
                 'response' => $response
             ];
         }
 
-        // ============================================================
-        // 7. ÉXITO
-        // ============================================================
-
         return [
-            'success' => true,
-
-            'message' =>
-            'Matriz de rúbrica sincronizada exitosamente',
-
+            'success'  => true,
+            'message'  => 'Matriz de rúbrica sincronizada exitosamente',
             'response' => $response
         ];
     }
