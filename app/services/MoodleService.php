@@ -837,45 +837,33 @@ class MoodleService
         $paramsMoodle = [
             'areas' => [
                 [
-                    'cmid' => (int) $cmid,
-                    'contextid' => (int) $contextId,
+                    // IMPORTANTE: Moodle espera ambos
+                    'cmid'      => (int)$cmid,
+                    'contextid' => (int)$contextId,
+
                     'component' => 'mod_assign',
+
                     'areaname' => 'submissions',
+
                     'activemethod' => 'rubric',
 
                     'definitions' => [
                         [
                             'method' => 'rubric',
-                            'name' => 'TEST SIGI',
-                            'description' => '',
+
+                            'name' =>
+                            'Rubrica Institucional (SIGI)',
+
+                            'description' =>
+                            'Matriz de evaluación sincronizada desde SIGI Académico.',
+
+                            'descriptionformat' => 1,
+
                             'status' => 20,
 
                             'rubric' => [
-                                'rubric_criteria' => [
-                                    [
-                                        'sortorder' => 1,
-                                        'description' => 'Criterio de prueba',
-                                        'descriptionformat' => 0,
-
-                                        'levels' => [
-                                            [
-                                                'score' => 0,
-                                                'definition' => 'No cumple',
-                                                'definitionformat' => 0
-                                            ],
-                                            [
-                                                'score' => 50,
-                                                'definition' => 'Cumple parcialmente',
-                                                'definitionformat' => 0
-                                            ],
-                                            [
-                                                'score' => 100,
-                                                'definition' => 'Cumple completamente',
-                                                'definitionformat' => 0
-                                            ]
-                                        ]
-                                    ]
-                                ]
+                                'rubric_criteria' =>
+                                $rubric_criteria
                             ]
                         ]
                     ]
@@ -901,7 +889,7 @@ class MoodleService
         // 4. ENVIAR A MOODLE
         // ============================================================
 
-        $response = $this->call(
+        /*$response = $this->call(
             'core_grading_save_definitions',
             $paramsMoodle,
             $MOODLE_URL,
@@ -921,7 +909,26 @@ class MoodleService
                         JSON_PRETTY_PRINT
                 )
         );
+*/
 
+$response = $this->call(
+    $MOODLE_URL,
+    $MOODLE_TOKEN,
+    'core_grading_get_definitions',
+    [
+        'cmids' => [(int)$cmid],
+        'areaname' => 'submissions',
+        'activeonly' => 0
+    ]
+);
+
+error_log(
+    '[SIGI-GRADING-DEFINITIONS] ' .
+    json_encode(
+        $response,
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+    )
+);
         // ============================================================
         // 6. ERROR MOODLE
         // ============================================================
