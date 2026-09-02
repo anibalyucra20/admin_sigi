@@ -763,7 +763,6 @@ class MoodleService
         $rubric_criteria = [];
         $sortOrderCrit = 1;
 
-        // array_values() garantiza que Moodle reciba índices estrictos: 0, 1, 2...
         $criteriosLimpios = array_values($rubricData['criterios'] ?? []);
 
         foreach ($criteriosLimpios as $criterio) {
@@ -773,9 +772,9 @@ class MoodleService
             foreach ($nivelesLimpios as $nivel) {
                 $def = trim($nivel['definition'] ?? '');
                 $levels[] = [
-                    'score'            => round((float)$nivel['score'], 2), // Obliga tipo Flotante
+                    'score'            => round((float)$nivel['score'], 2),
                     'definition'       => $def === '' ? ' ' : $def,
-                    'definitionformat' => 1 // 1 = FORMAT_HTML (Previene Invalid Parameter)
+                    'definitionformat' => 1
                 ];
             }
 
@@ -783,12 +782,12 @@ class MoodleService
             $rubric_criteria[] = [
                 'sortorder'         => (int)($criterio['sortorder'] ?? $sortOrderCrit++),
                 'description'       => $desc === '' ? ' ' : $desc,
-                'descriptionformat' => 1, // 1 = FORMAT_HTML
+                'descriptionformat' => 1,
                 'levels'            => $levels
             ];
         }
 
-        // Empaquetado estricto (Payload Marshalling)
+        // El payload ha sido reestructurado: Moodle rechaza el nodo 'rubric_criteria' y exige estrictamente 'criteria'
         $paramsMoodle = [
             'areas' => [
                 [
@@ -799,12 +798,12 @@ class MoodleService
                     'definitions'  => [
                         [
                             'method'      => 'rubric',
-                            'name'        => 'Rubrica SIGI', // Sin caracteres especiales por seguridad
+                            'name'        => 'Rubrica SIGI',
                             'description' => 'Matriz sincronizada desde SIGI Academico',
                             'descriptionformat' => 1,
-                            'status'      => 20, // 20 = Activo/Publicado
+                            'status'      => 20,
                             'rubric'      => [
-                                'rubric_criteria' => $rubric_criteria
+                                'criteria' => $rubric_criteria // <-- CORRECCIÓN ARQUITECTÓNICA 
                             ]
                         ]
                     ]
@@ -812,14 +811,8 @@ class MoodleService
             ]
         ];
 
-        // LOG DE AUDITORÍA: Escribimos el Payload exacto en el servidor.
-        // Si falla, en tu error.log verás exactamente cómo se armó la estructura.
-        error_log("[SIGI-RUBRICA-PAYLOAD] " . json_encode($paramsMoodle));
-
-        // Ejecución hacia Moodle
         $response = $this->call('core_grading_save_definitions', $paramsMoodle, $MOODLE_URL, $MOODLE_TOKEN);
 
-        // Validación de Error (Moodle WS Exceptions)
         if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
             return [
                 'success' => false,
