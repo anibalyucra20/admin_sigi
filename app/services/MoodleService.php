@@ -471,16 +471,23 @@ class MoodleService
         return $modulos_finales;
     }
 
+    /**
+     * Crea un módulo (actividad) en Moodle de forma atómica,
+     * incluyendo la inyección del JSON de rúbrica si existe.
+     */
     public function createModule($MOODLE_URL, $MOODLE_TOKEN, $courseid, $sectionid, $modname, $params)
     {
         // 1. Extraemos el JSON crudo si viene en el payload desde SIGI Local
         $rubric_json = '';
         if (isset($params['rubric_json'])) {
             $rubric_json = is_array($params['rubric_json']) ? json_encode($params['rubric_json']) : $params['rubric_json'];
-            unset($params['rubric_json']); // Lo sacamos para que no ensucie el resto
+            unset($params['rubric_json']); // Lo sacamos del array principal
         }
 
+        // 2. Mapeo de Custom Options
         $customOptions = [];
+        // NOTA ARQUITECTÓNICA: Solo excluimos name e intro. 
+        // Permitimos que 'advancedgradingmethod_submissions' pase limpio hacia Moodle.
         $exclude = ['name', 'intro'];
 
         foreach ($params as $key => $value) {
@@ -493,17 +500,40 @@ class MoodleService
             }
         }
 
-        // 2. LLAMADA ATÓMICA: Mandamos TODO (Tarea + Rúbrica) en un solo paquete a tu plugin local
-        $response = $this->call('local_sigiws_create_module', [
+        // 3. Empaquetado Atómico
+        $payloadMoodle = [
             'courseid'      => (int)$courseid,
             'sectionid'     => (int)$sectionid,
             'modname'       => (string)$modname,
             'name'          => (string)($params['name'] ?? 'Actividad SIGI'),
             'intro'         => (string)($params['intro'] ?? ''),
             'customoptions' => $customOptions,
-            'rubric_json'   => (string)$rubric_json // <--- ¡ESTE ES EL DISPARADOR ATÓMICO!
-        ], $MOODLE_URL, $MOODLE_TOKEN);
+            'rubric_json'   => (string)$rubric_json // El plugin de Moodle lo recibirá aquí
+        ];
 
+        // LOG DE AUDITORÍA: Ver qué enviamos exactamente
+        error_log("[SIGI-WS-CREATE-MODULE-PAYLOAD] " . json_encode($payloadMoodle, JSON_UNESCAPED_UNICODE));
+
+        // 4. LLAMADA AL WEB SERVICE
+        $response = $this->call('local_sigiws_create_module', $payloadMoodle, $MOODLE_URL, $MOODLE_TOKEN);
+
+        // LOG DE AUDITORÍA: Ver qué respondió Moodle
+        error_log("[SIGI-WS-CREATE-MODULE-RESPONSE] " . json_encode($response, JSON_UNESCAPED_UNICODE));
+
+        // ==========================================================
+        // 5. CONTROL DE EXCEPCIONES CORE DE MOODLE (No más errores ocultos)
+        // ==========================================================
+        if (is_array($response) && (isset($response['exception']) || isset($response['errorcode']))) {
+            $errorMoodle = $response['message'] ?? ($response['errorcode'] ?? 'Error fatal desconocido');
+            $debugMoodle = $response['debuginfo'] ?? 'Sin detalles de debug';
+
+            return [
+                'success' => false,
+                'error' => "Rechazado por Moodle: {$errorMoodle} | Debug: {$debugMoodle}"
+            ];
+        }
+
+        // 6. CONTROL DE ÉXITO
         if (isset($response['success']) && $response['success'] === true) {
             return [
                 'success'  => true,
@@ -512,7 +542,9 @@ class MoodleService
             ];
         }
 
-        return ['success' => false, 'error' => $response['warnings'][0] ?? 'Error WebService local_sigiws'];
+        // 7. CONTROL DE WARNINGS DEL PLUGIN
+        $warning = $response['warnings'][0] ?? 'Error desconocido en la ejecución del plugin local_sigiws';
+        return ['success' => false, 'error' => $warning];
     }
 
 
